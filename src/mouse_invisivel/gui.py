@@ -99,8 +99,16 @@ class Window(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(30)
-        self.setStyleSheet("QTabWidget::pane{border:1px solid #48515c;} QLabel{font-size:13px;}"
-                          "QPushButton{padding:5px 10px;} QLineEdit,QComboBox,QSpinBox,QDoubleSpinBox{padding:5px;}")
+        self.setStyleSheet(
+            "QWidget{color:#e9edf2;background-color:#20262f;}"
+            "QLabel{font-size:13px;background:transparent;}"
+            "QTabWidget::pane{border:1px solid #48515c;}"
+            "QTabBar::tab{background:#394654;color:#e9edf2;padding:8px 12px;}"
+            "QTabBar::tab:selected{background:#276f7e;}"
+            "QPushButton{background:#394654;color:#e9edf2;padding:5px 10px;border:1px solid #637182;border-radius:4px;}"
+            "QPushButton:hover{background:#4a5969;}"
+            "QLineEdit,QComboBox,QSpinBox,QDoubleSpinBox,QPlainTextEdit,QTableWidget{"
+            "background:#151b23;color:#e9edf2;padding:5px;border:1px solid #48515c;}")
         palette = QPalette()
         for role, color in [(QPalette.Window, "#20262f"), (QPalette.WindowText, "#e9edf2"),
                             (QPalette.Base, "#151b23"), (QPalette.AlternateBase, "#29313b"),
