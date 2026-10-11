@@ -16,6 +16,11 @@ args = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir
 if sys.platform == "darwin":
     args += ["--windowed", "--osx-bundle-identifier", "local.mouse-invisivel.desktop"]
     # PyInstaller spec is patched below to carry an explicit camera usage explanation.
+backend = "win32" if sys.platform == "win32" else "darwin" if sys.platform == "darwin" else "xorg"
+# pynput selects backends with importlib. A headless build cannot rely on importing
+# pynput during collect_submodules, which fails before discovering the backend.
+for module in (f"pynput.mouse._{backend}", f"pynput.keyboard._{backend}", f"pynput._util.{backend}"):
+    args += ["--hidden-import", module]
 args += [str(root / "scripts" / "launcher.py")]
 subprocess.run(args, cwd=root, check=True)
 if sys.platform == "darwin":

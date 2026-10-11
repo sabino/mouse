@@ -213,3 +213,36 @@ class InputSupervisor:
             # Do not forcibly kill the process that might still be releasing app-held input.
             return False
         return True
+
+
+def _probe_recording_child(connection):
+    from .platforms import RecordingAdapter
+    adapter = RecordingAdapter()
+    state = WorkerState(Executor(adapter))
+    state.arm("probe", 10.)
+    state.command("probe", 10.1, 10.1, ["drag"], None, 3)
+    state.tick(10.5, False)
+    connection.send({"native_input": False, "owned_buttons_released": not adapter.held,
+                     "events": adapter.events, "evidence": "Spawned recording adapter; not physical input"})
+    connection.close()
+
+
+def probe_recording_worker():
+    ctx = mp.get_context("spawn")
+    receiver, sender = ctx.Pipe(duplex=False)
+    process = ctx.Process(target=_probe_recording_child, args=(sender,))
+    process.start()
+    sender.close()
+    try:
+        if not receiver.poll(10):
+            raise RuntimeError("Recording worker spawn probe timed out")
+        result = receiver.recv()
+    finally:
+        receiver.close()
+        process.join(timeout=2)
+        if process.is_alive():
+            process.terminate()  # This probe owns only a recording adapter, no real input.
+            process.join(timeout=2)
+    if process.exitcode != 0:
+        raise RuntimeError(f"Recording worker failed: {process.exitcode}")
+    return result
