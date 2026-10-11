@@ -38,11 +38,11 @@ def input_allowed():
             return False, "No X11 display. Preview/training need a desktop session."
     if sys.platform == "darwin":
         try:
-            from Quartz import AXIsProcessTrusted
+            from HIServices import AXIsProcessTrusted
             if not AXIsProcessTrusted():
                 return False, "Accessibility denied. Enable the running app in macOS Privacy & Security."
         except ImportError:
-            return False, "Quartz accessibility diagnostics unavailable"
+            return False, "HIServices accessibility diagnostics unavailable"
     return True, "Input permission preflight passed; physical operation still requires a manual test."
 
 
