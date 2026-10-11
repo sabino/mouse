@@ -16,19 +16,34 @@ class Policy:
     since: float = 0.
     last_time: float = -1.
     holding: bool = False
+    rejection_since: float | None = None
 
     def reset(self):
         self.armed = self.holding = False
         self.candidate = ""
         self.since = 0.
         self.last_time = -1.
+        self.rejection_since = None
 
     def step(self, label, timestamp):
         if not math.isfinite(timestamp) or timestamp <= self.last_time:
             self.reset()
             return ["release"]
         self.last_time = timestamp
-        if label in ("rejected", "confusing", "lost"):
+        if label == "rejected":
+            # A bounded uncertain transition cannot execute anything. Preserve a prior
+            # neutral arm briefly so changing pose can pass through mixed temporal windows.
+            if self.rejection_since is None:
+                self.rejection_since = timestamp
+            self.candidate = ""
+            if self.holding:
+                self.holding = self.armed = False
+                return ["release"]
+            if timestamp - self.rejection_since >= 0.75:
+                self.armed = False
+            return []
+        self.rejection_since = None
+        if label in ("confusing", "lost"):
             self.armed = False
             self.candidate = ""
             if self.holding:

@@ -63,6 +63,10 @@ def monitors():
                 r = info.rect
                 found.append(Monitor(info.device, r.left, r.top, r.right-r.left, r.bottom-r.top))
             return True
+        ctypes.windll.user32.GetMonitorInfoW.argtypes = (wintypes.HMONITOR, ctypes.POINTER(Info))
+        ctypes.windll.user32.GetMonitorInfoW.restype = wintypes.BOOL
+        ctypes.windll.user32.EnumDisplayMonitors.argtypes = (wintypes.HDC, ctypes.POINTER(wintypes.RECT),
+                                                            callback_type, wintypes.LPARAM)
         callback = callback_type(collect)
         ctypes.windll.user32.EnumDisplayMonitors(None, None, callback, 0)
         return found

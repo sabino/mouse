@@ -18,6 +18,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install Linux desktop libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libegl1 libxcb-cursor0 libxkbcommon-x11-0
       - name: Install pinned dependencies
         run: python -m pip install --require-hashes -r requirements-dev.lock
       - name: Install project without resolving dependencies
@@ -26,3 +29,44 @@ jobs:
         run: python -m ruff check src tests
       - name: Test learned model and safety policy (synthetic/mocked evidence)
         run: python -m pytest -q
+      - name: Import real camera/landmark libraries without opening devices
+        run: python -c "import cv2; import mediapipe; print(cv2.__version__, mediapipe.__version__)"
+      - name: Headless desktop smoke (no camera/input)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m mouse_invisivel --smoke-test
+      - name: Dependency check
+        run: python -m pip check
+      - name: Inventory dependency licenses
+        run: python -m piplicenses --format=json --with-license-file --no-license-path --output-file=dependency-licenses.json
+      - name: Build on the native target OS
+        run: python scripts/build.py
+      - name: Smoke native package and retain notices
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            dist/MouseInvisivel/MouseInvisivel.exe --check-libraries
+            dist/MouseInvisivel/MouseInvisivel.exe --diagnostics
+            dist/MouseInvisivel/MouseInvisivel.exe --smoke-test
+            python scripts/check_package.py dist/MouseInvisivel/MouseInvisivel.exe
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            dist/MouseInvisivel.app/Contents/MacOS/MouseInvisivel --check-libraries
+            dist/MouseInvisivel.app/Contents/MacOS/MouseInvisivel --diagnostics
+            dist/MouseInvisivel.app/Contents/MacOS/MouseInvisivel --smoke-test
+            python scripts/check_package.py dist/MouseInvisivel.app/Contents/MacOS/MouseInvisivel
+          else
+            dist/MouseInvisivel/MouseInvisivel --check-libraries
+            dist/MouseInvisivel/MouseInvisivel --diagnostics
+            dist/MouseInvisivel/MouseInvisivel --smoke-test
+            python scripts/check_package.py dist/MouseInvisivel/MouseInvisivel
+          fi
+          cp dependency-licenses.json dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MouseInvisivel-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          path: |
+            dist/
+            dependency-licenses.json
+          retention-days: 14
