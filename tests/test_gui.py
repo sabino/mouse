@@ -159,3 +159,23 @@ def test_close_waits_for_delayed_button_release_and_worker_completion(tmp_path):
         supervisor.process.join(timeout=5)
         w.input = None
         w.close()
+
+
+def test_wayland_display_change_stops_input_and_invalidates_calibration(tmp_path, monkeypatch):
+    import threading
+    from types import SimpleNamespace
+    from mouse_invisivel import gui
+    monkeypatch.setattr(gui, "is_wayland", lambda: True)
+    app = QApplication.instance() or QApplication([])
+    w = Window(tmp_path)
+    stopped = threading.Event()
+    w.input = SimpleNamespace(ready=True, stop=stopped, pause=lambda: None,
+        poll=lambda: [], process=SimpleNamespace(is_alive=lambda: True), close=lambda: True)
+    w.active = True
+    w.profile.calibration = object()
+    monkeypatch.setattr(w, "display_fingerprint", lambda: [("changed", 0, 0, 1600, 900, 144)])
+    w.tick()
+    assert not w.active and not w.input.ready and stopped.is_set()
+    assert w.profile.calibration is None
+    w.close()
+    app.processEvents()

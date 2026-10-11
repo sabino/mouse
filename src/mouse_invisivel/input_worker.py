@@ -2,7 +2,7 @@
 import multiprocessing as mp
 from queue import Empty, Full
 import time
-from .platforms import make_adapter, monitors
+from .platforms import make_adapter, monitors, is_wayland, Monitor
 
 MAX_AGE = 0.25
 WATCHDOG = 0.35
@@ -85,23 +85,36 @@ def _worker(commands, status, inhibit, stop, epoch, release_complete):
             pass
     def emergency():
         inhibit.set()
-        report("stop", "Emergency stop (Esc). Re-activation requires neutral.")
+        report("stop", "Global emergency stop received. Re-activation requires neutral.")
+    def failed(reason):
+        inhibit.set()
+        report("error", reason)
     try:
-        adapter = make_adapter()
+        if is_wayland():
+            from .wayland import PortalAdapter
+            report("authorizing", "Approve pointer + monitor metadata and choose emergency shortcut in desktop portal dialogs. No persistent grant/screen pixels.")
+            adapter = PortalAdapter(emergency, stop, failed)
+            listener = adapter
+            get_monitors = adapter.monitors
+        else:
+            adapter = make_adapter()
+            from pynput import keyboard
+            def on_press(key):
+                if key == keyboard.Key.esc:
+                    emergency()
+            listener = keyboard.Listener(on_press=on_press)
+            listener.start()
+            listener.wait()
+            get_monitors = monitors
         executor = Executor(adapter)
         state = WorkerState(executor)
-        from pynput import keyboard
-        def on_press(key):
-            if key == keyboard.Key.esc:
-                emergency()
-        listener = keyboard.Listener(on_press=on_press)
-        listener.start()
-        listener.wait()
-        topology = monitors()
+        topology = get_monitors()
         if not topology:
             raise RuntimeError("No native display coordinates available")
         # Operator must verify Esc reception before first activation.
-        report("ready", "Input backend ready. Press Esc once to verify the global emergency stop.")
+        report("monitors", [m.to_dict() for m in topology])
+        trigger = adapter.portal.trigger if is_wayland() else "Esc"
+        report("ready", f"Input backend ready. Physically press {trigger} once to verify global stop before activation.")
         last_check = time.monotonic()
         while not stop.is_set():
             now = time.monotonic()
@@ -111,7 +124,7 @@ def _worker(commands, status, inhibit, stop, epoch, release_complete):
                 report("paused", "Paused: watchdog, tracking timeout or explicit pause")
             if now - last_check > 0.5:
                 adapter.check()
-                if monitors() != topology:
+                if get_monitors() != topology:
                     raise RuntimeError("Display layout/DPI changed; pause and restart input diagnostics")
                 last_check = now
             try:
@@ -164,6 +177,7 @@ class InputSupervisor:
         self.token = None
         self.ready = False
         self.emergency_verified = False
+        self.screens = []
 
     def poll(self):
         events = []
@@ -174,6 +188,8 @@ class InputSupervisor:
                 break
             if kind == "ready":
                 self.ready = True
+            if kind == "monitors":
+                self.screens = [Monitor(**m) for m in detail]
             if kind == "error":
                 self.ready = False
             if kind == "stop":
@@ -188,7 +204,7 @@ class InputSupervisor:
 
     def activate(self):
         if not self.ready or not self.emergency_verified or not self.process.is_alive():
-            raise RuntimeError("Run input diagnostics and physically verify global Esc before activation")
+            raise RuntimeError("Authorize/verify input and physically test the global stop before activation")
         self.pause()
         self.token = self.epoch.value
         self.activated_at = time.monotonic()

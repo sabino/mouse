@@ -15,6 +15,7 @@ Native artifacts are draft CI/local artifacts, not published releases.
 | OpenCV contrib | 4.11.0.86 | Apache-2.0 plus bundled notices | Camera access, no raw recording |
 | pynput | 1.8.1 | LGPL-3.0 | Quartz/XTest adapters and Esc listener |
 | platformdirs | 4.3.7 | MIT | Local data location |
+| dbus-next | 0.2.3 (Linux only) | MIT | Typed session-bus portal protocol; pure Python |
 | JAX / jaxlib | 0.4.35 | Apache-2.0 plus bundled notices | MediaPipe transitive; pinned for Intel/ARM platform wheels |
 | PyInstaller | 6.12.0 | GPL-2.0 with bootloader exception | Native directory/app builds |
 
@@ -54,6 +55,15 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 Model card:
 https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Hand%20Tracking%20(Lite_Full)%20with%20Fairness%20Oct%202021.pdf
 
+On the follow-up permitted request, Python urllib reported exactly
+`<urlopen error Tunnel connection failed: 403 Forbidden>` while connecting through
+the environment's HTTPS proxy. There was no model HTTP response from Google Storage,
+no GCS error body/asset headers and no model bytes. This is evidence of a proxy CONNECT
+denial, not evidence that Google requires credentials for this documented public URL.
+Acquisition stopped after that denial: no proxy bypass, alternate transport/mirror or
+credentials were attempted. The official Python sample uses the same versioned URL:
+https://raw.githubusercontent.com/google-ai-edge/mediapipe-samples/main/examples/hand_landmarker/python/hand_landmarker.ipynb
+
 The model card describes a two-stage CNN. MediaPipe's code license and the website's
 code-sample license are not proof of the separate weight license. This environment's
 permitted request for the asset returned HTTP 403. We did not bypass that response,
@@ -62,6 +72,13 @@ requires the user to select a licensed, locally obtained Hand Landmarker `.task`
 Confirm that asset's terms with its provider before redistribution. A trusted file
 from the official provider is preferable; native model parsers are not an arbitrary
 Python deserialization path, but selecting an unknown file is not recommended.
+
+The official sample's Apache notice covers that notebook; the documentation footer
+covers page content/code samples. Neither explicitly establishes terms for the separately
+hosted binary weights. Primary-source review did not resolve that distinction; do not
+infer a weight license from third-party mirrors or framework metadata. A locally obtained
+asset plus provider-confirmed terms remain prerequisites. `dbus-next` primary MIT source:
+https://github.com/altdesktop/python-dbus-next/blob/v0.2.3/LICENSE
 
 The personalized gesture model is numeric parameters learned from the user's own
 local landmark sessions; there is no fabricated training data or bundled gesture model.

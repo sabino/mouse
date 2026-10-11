@@ -1,7 +1,8 @@
 # Mouse Invisível
 
 Aplicação desktop local para treinar gestos pessoais e controlar o cursor por câmera.
-macOS, Windows e Linux X11 são os alvos de entrada; Wayland nativo oferece prévia e treino.
+macOS, Windows e Linux X11 são os alvos de entrada. Wayland tem um adaptador por portais
+com consentimento; o backend Sway/wlr atual não oferece os portais necessários para entrada.
 Começa **pausada**, sem gravação de vídeo e sem upload de imagens ou landmarks.
 
 O MediaPipe extrai landmarks com redes neurais pré-treinadas. O modelo de gestos é
@@ -56,7 +57,13 @@ neste Cloud, `CC=gcc` resolveu a ausência de clang. Não é usado uinput para c
 4. Salve/recarregue o modelo JSON; configure ações/perfil, mão, monitor, sensibilidade,
    suavização e confiança. Calibre cinco pontos do alcance confortável do indicador.
    Salve o perfil/calibração JSON. Prévia mostra previsões sem entrada.
-5. Verifique a entrada; pressione **Esc global uma vez** para testar o stop. Ative somente
+5. Verifique a entrada; pressione **Esc global uma vez** para testar o stop no X11/macOS/Windows.
+   Em Wayland, clique **Autorizar portal**, aprove os diálogos se desejar e teste o atalho
+   global escolhido pelo desktop (sugestão Ctrl+Alt+Shift+Esc). O portal pede ponteiro e
+   compartilhamento de monitor para coordenadas, mas o app não lê pixels da tela nem
+   guarda permissões remotas/restore tokens. Consulte o diagnóstico antes: Sway/wlr atual
+   não oferece RemoteDesktop/GlobalShortcuts, portanto continua sem controle nativo.
+   Ative somente
    depois dos testes na prévia. Mostre `neutral` para armar e entre episódios de ação.
    `pointer` move; `click`/`secondary` clicam; `drag` segura; `release` solta; `scroll_up`/
    `scroll_down` rolam. O mapeamento é configurável. Esc/stop, perda de mão, atraso, mudança
@@ -65,7 +72,8 @@ neste Cloud, `CC=gcc` resolveu a ausência de clang. Não é usado uinput para c
 É possível exportar e excluir sessões pela interface. Modelos/perfis são JSON locais
 independentes; exclua-os no gerenciador de arquivos se quiser remover parâmetros derivados.
 Nenhuma permissão permanente é concedida automaticamente. O app exige teste físico do Esc
-antes de ativar; no macOS, conceda permissões manualmente se desejar usar controle.
+antes de ativar (atalho autorizado pelo portal em Wayland); no macOS, conceda permissões
+manualmente se desejar usar controle.
 
 ## Verificação e builds
 

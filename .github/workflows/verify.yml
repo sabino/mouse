@@ -32,7 +32,7 @@ jobs:
           fi
       - name: Install Linux desktop libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libegl1 libxcb-cursor0 libxkbcommon-x11-0
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libegl1 libxcb-cursor0 libxkbcommon-x11-0 dbus
       - name: Verify the isolated interpreter
         run: python -c "import sys; print(sys.executable); assert sys.prefix != sys.base_prefix"
       - name: Install pinned dependencies

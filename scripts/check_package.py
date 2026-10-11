@@ -13,6 +13,9 @@ binary = str(Path(sys.argv[1]).resolve())
 probe = subprocess.run([binary, "--check-worker"], text=True, capture_output=True, check=True, timeout=30)
 assert json.loads(probe.stdout)["native_input"] is False
 assert json.loads(probe.stdout)["owned_buttons_released"] is True
+if sys.platform.startswith("linux"):
+    subprocess.run(["dbus-run-session", "--", sys.executable, str(root / "tests" / "test_wayland.py"),
+                    "package", binary], check=True, timeout=25)
 with tempfile.TemporaryDirectory(prefix="mouse-package-test-") as folder:
     d = Path(folder)
     for sid in ("s1", "s2"):

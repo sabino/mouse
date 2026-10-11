@@ -6,7 +6,7 @@ import threading
 import time
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QImage, QPixmap, QShortcut, QKeySequence, QPalette, QColor
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                                QTabWidget, QFormLayout, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
                                QFileDialog, QMessageBox, QPlainTextEdit, QTableWidget, QTableWidgetItem,
                                QHeaderView, QProgressBar)
@@ -17,7 +17,7 @@ from .model import Model, train
 from .profile import Profile
 from .runtime import Runtime
 from .calibration import Calibration
-from .platforms import monitors, diagnostics
+from .platforms import monitors, diagnostics, is_wayland
 from .input_worker import InputSupervisor, MAX_AGE
 from .safety import ACTIONS
 from .storage import write_json
@@ -69,6 +69,7 @@ class Window(QMainWindow):
         self.training_thread, self.training_result = None, None
         self.training_lock = threading.Lock()
         self.screens = []
+        self.display_layout = self.display_fingerprint()
         root = QWidget()
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
@@ -80,7 +81,7 @@ class Window(QMainWindow):
         self.state = QLabel("PAUSADO · prévia sem entrada")
         self.state.setStyleSheet("font-weight:bold;color:#e8ba55;")
         top.addWidget(self.state, 1)
-        self.pause_button = button("PARAR AGORA · Esc", self.pause)
+        self.pause_button = button("PARAR AGORA · Esc nesta janela" if is_wayland() else "PARAR AGORA · Esc", self.pause)
         self.pause_button.setStyleSheet("background:#9c3038;color:white;font-weight:bold;padding:6px 18px;")
         top.addWidget(self.pause_button)
         outer.addLayout(top)
@@ -149,12 +150,16 @@ class Window(QMainWindow):
         self.prediction = QLabel("Modelo pessoal ainda não carregado")
         layout.addWidget(self.prediction)
         row = QHBoxLayout()
-        row.addWidget(button("Verificar entrada / testar Esc global", self.prepare_input))
+        row.addWidget(button("Autorizar portal / testar parada global" if is_wayland()
+                             else "Verificar entrada / testar Esc global", self.prepare_input))
         self.activate_button = button("Ativar controle", self.activate)
         row.addWidget(self.activate_button)
+        self.stop_hint = QLabel("Parada global: autorize/verifique a entrada e teste o atalho antes de ativar.")
+        self.stop_hint.setWordWrap(True)
+        layout.addWidget(self.stop_hint)
         layout.addLayout(row)
         layout.addWidget(QLabel("Começa pausado. Após ativar: mostre neutral para armar; cada ação exige novo neutral.\n"
-                                "Ative somente depois de conferir as previsões, calibrar e testar Esc global."))
+                                "Ative somente depois de conferir as previsões, calibrar e testar a parada global."))
 
     def _collect_tab(self, tabs):
         layout = tab(tabs, "2 · Exemplos locais")
@@ -276,7 +281,8 @@ class Window(QMainWindow):
         layout = tab(tabs, "5 · Diagnóstico")
         layout.addWidget(QLabel("macOS: Câmera + Acessibilidade, e Monitoramento de Entrada para Esc se necessário.\n"
                                 "Windows: desktop normal; aplicações elevadas podem rejeitar entrada.\n"
-                                "Linux: entrada X11/XTest; Wayland nativo permite apenas prévia/coleta/treino.\n"
+                                "Linux X11: XTest. Wayland: RemoteDesktop + GlobalShortcuts com consentimento explícito.\n"
+                                "Sway/wlr pode não oferecer esses portais: consulte o diagnóstico; sem fallback XWayland.\n"
                                 "Nenhuma permissão é concedida automaticamente."))
         row = QHBoxLayout()
         row.addWidget(button("Atualizar diagnóstico", self.refresh_diagnostics))
@@ -363,7 +369,8 @@ class Window(QMainWindow):
                 self.error("Processo de entrada não respondeu; reinicie antes de testar novamente")
                 return
         self.input = InputSupervisor()
-        self.message("Verificando backend. Depois pressione Esc global uma vez para habilitar a ativação.")
+        self.message("Verificando backend. Wayland abre diálogos de consentimento para ponteiro/monitores e parada. "
+                     "Confira o atalho global informado e teste-o antes de ativar; nenhum pixel de tela é lido.")
 
     def activate(self):
         try:
@@ -377,7 +384,7 @@ class Window(QMainWindow):
             if not 0 <= self.monitor.currentIndex() < len(self.screens):
                 raise ValueError("Nenhum monitor nativo selecionado")
             if not self.input:
-                raise ValueError("Verifique a entrada e teste Esc global primeiro")
+                raise ValueError("Autorize/verifique a entrada e teste a parada global primeiro")
             self.input.activate()
             self.active = True
             self.runtime.reset()
@@ -626,7 +633,7 @@ class Window(QMainWindow):
         self.monitor.blockSignals(True)
         self.monitor.clear()
         try:
-            self.screens = monitors()
+            self.screens = getattr(self.input, "screens", []) if is_wayland() and self.input else monitors()
         except Exception:
             self.screens = []
         for m in self.screens:
@@ -715,9 +722,24 @@ class Window(QMainWindow):
                 self.error(e)
 
     def tick(self):
+        layout = self.display_fingerprint()
+        if is_wayland() and layout != self.display_layout:
+            self.pause()
+            self.profile.calibration = None
+            self.cal_label.setText("Layout/DPI mudou: reautorize o portal, confira o monitor e recalibre.")
+            if self.input:
+                self.input.ready = False
+                self.input.stop.set()
+            self.message("Pausado por mudança de layout/DPI Wayland. Reautorize a entrada antes de ativar.")
+        self.display_layout = layout
         if self.input:
             for kind, detail in self.input.poll():
-                self.message(detail)
+                if kind == "monitors":
+                    self.refresh_monitors()
+                else:
+                    self.message(detail)
+                if kind == "ready":
+                    self.stop_hint.setText(detail)
                 if kind in ("paused", "stop", "error"):
                     self.pause()
             if self.active and (self.input.inhibit.is_set() or not self.input.process.is_alive()):
@@ -814,6 +836,11 @@ class Window(QMainWindow):
         except Exception as e:
             self.pause()
             self.message(str(e))
+
+    @staticmethod
+    def display_fingerprint():
+        return [(s.name(), s.geometry().x(), s.geometry().y(), s.geometry().width(),
+                 s.geometry().height(), round(s.logicalDotsPerInch(), 2)) for s in QApplication.screens()]
 
     def closeEvent(self, event):
         self.pause()

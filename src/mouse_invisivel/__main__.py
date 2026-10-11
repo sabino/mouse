@@ -20,7 +20,16 @@ def main():
     parser.add_argument("--classifier", choices=["logistic", "gaussian_nb"], default="logistic")
     parser.add_argument("--output", help="Output numeric model JSON for --train")
     parser.add_argument("--check-worker", action="store_true", help="Probe frozen multiprocessing with a recording adapter only")
+    parser.add_argument("--check-portal", action="store_true", help="Read-only Linux portal capabilities; no consent/input")
     args = parser.parse_args()
+    if args.check_portal:
+        import sys
+        if not sys.platform.startswith("linux"):
+            print(json.dumps({"available": False, "detail": "Linux-only portal backend", "consent_requested": False}))
+        else:
+            from .wayland import probe_sync
+            print(json.dumps(probe_sync(), indent=2))
+        return
     if args.check_worker:
         from .input_worker import probe_recording_worker
         print(json.dumps(probe_recording_worker()))

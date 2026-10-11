@@ -19,8 +19,11 @@ OS failure and physical stuck buttons cannot be guaranteed by software.
 Default mode: paused, local preview only, no raw recording/upload. Persistence
 stores only landmarks, labels and session metadata when explicitly captured.
 Linux X11, macOS accessibility and Windows normal-integrity desktops are supported
-adapter targets. Native Wayland input is explicitly disabled until a consent-based
-RemoteDesktop portal/libei adapter is validated. No automatic privilege elevation.
+adapter targets. Wayland has a consent-only RemoteDesktop Notify adapter with
+ScreenCast monitor metadata and GlobalShortcuts emergency stop. Missing backends
+disable live input; Sway/wlr currently lacks RemoteDesktop/GlobalShortcuts. No
+XWayland/uinput fallback or automatic privilege elevation. Private D-Bus protocol
+tests use a fake portal; physical compositor acceptance remains open.
 
 Primary documentation consulted 2026-10-11:
 - https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker/python

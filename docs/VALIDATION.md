@@ -6,17 +6,18 @@ validation. A working headless build is not proof of real hardware usability.
 | State | Evidence | Limit |
 |---|---|---|
 | Built core | `dev` ee11dba3facb3ca86200ac58fa88529f7d62899d, draft PR #5 | Desktop is stacked on feat/desktop |
-| Unit/synthetic replay | 19 local tests passing + 2 native bridge/ABI tests skipped on Linux, classifier numeric round-trip checked against sklearn | Mathematical fixtures, not recorded physical hand data |
+| Unit/synthetic replay | 30 local tests passing + 2 native bridge/ABI tests skipped on Linux, classifier numeric round-trip checked against sklearn | Mathematical fixtures, not recorded physical hand data |
 | Mocked input | Ownership, partial native failure, stale timestamps, watchdog, neutral/rejection, degenerate-feature/hand-switch drag release, delayed production-worker shutdown, Wayland refusal | No physical input/camera |
 | Headless desktop | Qt offscreen capture/label/train/reload/preview test + GUI smoke | Synthetic packet; no real camera/model detection |
 | Core CI | https://github.com/sabino/mouse/actions/runs/38168215710 successful | Three OS test jobs, 11 core tests; not physical input |
 | Linux native package | PyInstaller directory built and diagnostics/GUI smoke passed locally | Cloud Linux, headless; frozen worker probe and synthetic train/reload/replay also passed |
-| Desktop/native CI | https://github.com/sabino/mouse/actions/runs/38169560710: all three native builds, library/GUI checks and frozen train/reload/replay assertions passed | Windows final test-log output encoding fixed afterward; artifact quota blocks upload; latest PR check is source of truth |
+| Desktop/native CI before portals | https://github.com/sabino/mouse/actions/runs/38170728954 at 96c38ef: all three source/native/frozen checks passed; Linux 19 pass/2 skip, macOS/Windows 20 pass/1 skip | Workflow red solely on upload quota; latest PR check/comments report subsequent portal head |
 | Physical camera/input | NOT TESTED on macOS/Windows/Linux | Requires user's hardware + real personally recorded sessions |
-| Native Wayland input | Explicitly unavailable | Preview/label/train only |
+| Native Wayland protocol | 10 private D-Bus cases: fake portal, actual dbus-daemon and production spawned worker; no OS consent/input | Physical compositor not tested; Sway/wlr lacks RemoteDesktop/GlobalShortcuts (issue #8) |
 | Reference analysis | Transcript inaccessible | No timestamps/algorithm details inferred |
-| Hand Landmarker weights | Versioned official URL returned HTTP 403 in Cloud | No bypass; user selects licensed local .task, not redistributed |
+| Hand Landmarker weights | Follow-up request failed at proxy CONNECT: Tunnel connection failed: 403 Forbidden | No model-server response/bytes; no bypass; license still unverified |
 | GitHub artifact delivery | Upload blocked: artifact storage quota hit (issue #7) | No unrelated artifacts deleted; local Linux directory remains available |
+| Private Library delivery | Supported helper retry failed on hosted apps tools/list network | No saved Library file/link returned; preserved 96c38ef archive checksum in #7 |
 | Distribution license/signing | Inventory generated; final embedded native/Qt notices review and signing pending | No release/public distribution |
 
 Actual-hand replay can run with no OS input:
