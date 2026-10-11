@@ -63,6 +63,7 @@ class Window(QMainWindow):
         self.session = Session("pessoa-local")
         self.sessions = []
         self.recording = None
+        self.sequence_recording = None
         self.cal_points = []
         self.cal_target = None
         self.training_thread, self.training_result = None, None
@@ -166,6 +167,12 @@ class Window(QMainWindow):
         row.addWidget(button("Cancelar exemplo", self.cancel_recording))
         row.addWidget(button("Excluir último exemplo", self.delete_clip))
         layout.addLayout(row)
+        sequence_row = QHBoxLayout()
+        sequence_row.addWidget(button("Iniciar sequência contínua rotulada", self.start_sequence))
+        sequence_row.addWidget(button("Encerrar sequência", self.end_sequence))
+        layout.addLayout(sequence_row)
+        layout.addWidget(QLabel("Sequência: mude o rótulo explicitamente ao mudar o gesto, incluindo neutral entre ações.\n"
+                                "Mantenha cada rótulo por ≥2 s. Landmarks contínuos permitem avaliar episódios completos."))
         self.capture_progress = QProgressBar()
         self.capture_progress.setRange(0, 100)
         layout.addWidget(self.capture_progress)
@@ -350,7 +357,7 @@ class Window(QMainWindow):
 
     def activate(self):
         try:
-            if self.recording or self.cal_target is not None or (self.training_thread and self.training_thread.is_alive()):
+            if self.recording or self.sequence_recording or self.cal_target is not None or (self.training_thread and self.training_thread.is_alive()):
                 raise ValueError("Finalize coleta, calibração e treinamento antes de ativar")
             self.current_frame()
             self.apply_profile()
@@ -403,8 +410,8 @@ class Window(QMainWindow):
             label = self.label.currentText().strip()
             if not label_valid(label):
                 raise ValueError("Rótulo: até 48 letras/números, _ ou -")
-            if self.recording:
-                raise ValueError("Finalize ou cancele o exemplo atual")
+            if self.recording or self.sequence_recording:
+                raise ValueError("Finalize ou cancele a coleta atual")
             if self.cal_target is not None:
                 raise ValueError("Finalize a calibração primeiro")
             start = time.monotonic() + 1.
@@ -413,8 +420,42 @@ class Window(QMainWindow):
         except Exception as e:
             self.error(e)
 
+    def start_sequence(self):
+        self.pause()
+        try:
+            self.current_frame()
+            if self.recording or self.sequence_recording or self.cal_target is not None:
+                raise ValueError("Finalize a coleta/calibração atual primeiro")
+            label = self.label.currentText().strip()
+            if not label_valid(label):
+                raise ValueError("Escolha um rótulo válido")
+            self.sequence_recording = {"label": label, "frames": []}
+            self.message("Sequência contínua: mude o rótulo ao mudar gesto. Inclua neutral entre ações; nenhum input.")
+        except Exception as e:
+            self.error(e)
+
+    def append_sequence_clip(self):
+        r = self.sequence_recording
+        if r and r["frames"]:
+            try:
+                from .features import windows
+                clip = Clip(r["label"], r["frames"])
+                if len(list(windows(clip.frames))) < 5:
+                    raise ValueError("Segmento curto demais; mantenha o próximo rótulo por ≥2 s")
+                self.session.clips.append(clip)
+                self.refresh_clips()
+            except ValueError as e:
+                self.message(str(e))
+
+    def end_sequence(self):
+        self.pause()
+        self.append_sequence_clip()
+        self.sequence_recording = None
+        self.message("Sequência encerrada em memória; salve a sessão JSON.")
+
     def cancel_recording(self):
         self.recording = None
+        self.sequence_recording = None
         self.capture_progress.setValue(0)
 
     def refresh_clips(self):
@@ -683,7 +724,7 @@ class Window(QMainWindow):
         packet = self.camera.latest() if self.camera else None
         if packet is None or packet.sequence == self.last_sequence:
             if packet and time.monotonic() - packet.timestamp > MAX_AGE:
-                if self.recording:
+                if self.recording or self.sequence_recording:
                     self.cancel_recording()
                     self.message("Exemplo descartado: a câmera parou de entregar frames recentes.")
                 if self.cal_target is not None:
@@ -703,6 +744,16 @@ class Window(QMainWindow):
         image = QImage(rgb.data, rgb.shape[1], rgb.shape[0], rgb.strides[0], QImage.Format_RGB888).copy()
         self.video.setPixmap(QPixmap.fromImage(image).scaled(self.video.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
         frame = packet.landmark
+        if self.sequence_recording:
+            current_label = self.label.currentText().strip()
+            if frame is None or time.monotonic() - packet.timestamp > MAX_AGE or not label_valid(current_label):
+                self.cancel_recording()
+                self.message("Sequência interrompida por tracking/atraso/rótulo inválido; segmento atual descartado.")
+            else:
+                if current_label != self.sequence_recording["label"]:
+                    self.append_sequence_clip()
+                    self.sequence_recording = {"label": current_label, "frames": []}
+                self.sequence_recording["frames"].append(frame)
         if self.recording:
             r = self.recording
             now = time.monotonic()

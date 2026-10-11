@@ -42,3 +42,36 @@ def test_headless_gui_capture_label_train_reload_preview(tmp_path):
     assert any("click" in e["actions"] for e in replay["events"])
     w.close()
     app.processEvents()
+
+
+def test_continuous_labeled_sequence_keeps_session_boundaries_and_has_no_input(tmp_path, monkeypatch):
+    app = QApplication.instance() or QApplication([])
+    w = Window(tmp_path)
+    w.timer.stop()
+    w.session.source = "synthetic-test"
+    clock = [100.]
+    monkeypatch.setattr("mouse_invisivel.gui.time.monotonic", lambda: clock[0])
+    state = {"seq": 0, "label": "neutral"}
+    class FakeCamera:
+        def latest(self):
+            return Packet(state["seq"], clock[0], np.zeros((20, 20, 3), dtype=np.uint8),
+                          Frame(clock[0], fake_points(state["label"])), "Synthetic unit packet")
+        def close(self):
+            return True
+    w.camera = FakeCamera()
+    w.tick()
+    w.start_sequence()
+    for label in ("neutral", "click", "neutral", "confusing"):
+        state["label"] = label
+        w.label.setCurrentText(label)
+        for _ in range(60):
+            clock[0] += 1/30
+            state["seq"] += 1
+            w.tick()
+    w.end_sequence()
+    assert [c.label for c in w.session.clips] == ["neutral", "click", "neutral", "confusing"]
+    for a, b in zip(w.session.clips, w.session.clips[1:]):
+        assert 0 < b.frames[0].timestamp-a.frames[-1].timestamp < .05
+    assert not w.active and w.input is None
+    w.close()
+    app.processEvents()

@@ -10,3 +10,4 @@ dist/
 local-data/
 *.task
 coverage.xml
+.ci-venv/

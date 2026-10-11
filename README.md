@@ -47,6 +47,9 @@ neste Cloud, `CC=gcc` resolveu a ausência de clang. Não é usado uinput para c
    de cada gesto, `neutral` e `confusing`. Dê nomes aos gestos e mapeie depois; não há poses
    impostas por regras geométricas. Salve/exporte cada sessão JSON e crie novas sessões em
    dias/condições diferentes. Apenas landmarks, rótulos e metadados são persistidos.
+   Para avaliação de episódios, use **sequência contínua rotulada**: mude explicitamente o
+   rótulo ao mudar gesto, incluindo neutral entre ações, e mantenha cada rótulo por ≥2 s.
+   Clipes isolados com intervalos são úteis para classificação; não validam o re-armamento.
 3. Adicione duas ou mais sessões em Treinar. Escolha uma sessão inteira (ou pessoa) reservada
    e o classificador ANTES de avaliar. Confira relatório, rejeição, precisão/recall de
    episódios e falsas ativações por minuto neutro. Veja [protocolo de treino](docs/LEARNING.md).

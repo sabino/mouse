@@ -11,12 +11,16 @@ Native artifacts are draft CI/local artifacts, not published releases.
 | SciPy | 1.15.2 | BSD-3-Clause plus bundled-library notices | Ridge/ML dependencies |
 | scikit-learn | 1.6.1 | BSD-3-Clause | User-trained traditional classifiers |
 | PySide6 / Qt | 6.8.3 | LGPL-3.0/GPL-3.0/commercial (module-dependent) | Review exact Qt modules before distribution |
-| MediaPipe code | 0.10.21 | Apache-2.0 | Pretrained neural landmark extraction runtime |
+| MediaPipe code | 0.10.21 (Intel/Windows/Linux), 0.10.32 (macOS ARM) | Apache-2.0 | Pretrained neural landmark extraction runtime |
 | OpenCV contrib | 4.11.0.86 | Apache-2.0 plus bundled notices | Camera access, no raw recording |
 | pynput | 1.8.1 | LGPL-3.0 | Quartz/XTest adapters and Esc listener |
 | platformdirs | 4.3.7 | MIT | Local data location |
 | JAX / jaxlib | 0.4.35 | Apache-2.0 plus bundled notices | MediaPipe transitive; pinned for Intel/ARM platform wheels |
 | PyInstaller | 6.12.0 | GPL-2.0 with bootloader exception | Native directory/app builds |
+
+The 0.10.21 universal2 macOS wheel contains an Intel-only WHEEL tag. ARM selects
+0.10.32 explicitly; CI must check its actual Tasks imports and package. We do not
+suppress pip check or patch upstream wheel metadata.
 
 `uv.lock` and `requirements-dev.lock` pin the full platform-marked graph and file hashes.
 CI exports `dependency-licenses.json` and full license texts from the installed target
