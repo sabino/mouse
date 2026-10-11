@@ -9,12 +9,21 @@ import pytest
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="Linux portal protocol")
 @pytest.mark.parametrize("case", ["missing", "denied", "no_pointer", "no_shortcut", "coordinates",
-                                  "cancel", "success", "owner_lost", "shortcut_changed", "worker"])
-def test_private_portal_protocol(case):
+                                  "cancel", "success", "owner_lost", "shortcut_changed", "worker", "autostart"])
+def test_private_portal_protocol(case, tmp_path):
     if not shutil.which("dbus-run-session"):
         pytest.fail("Linux protocol tests require dbus-run-session; do not silently skip safety evidence")
+    env = {**os.environ, "XDG_SESSION_TYPE": "wayland", "WAYLAND_DISPLAY": "portal-test"}
+    if case == "autostart":
+        services = tmp_path / "dbus-1" / "services"
+        services.mkdir(parents=True)
+        import shlex
+        command = shlex.join([sys.executable, str(Path(__file__).resolve()), "server"])
+        (services / "org.freedesktop.portal.Desktop.service").write_text(
+            "[D-BUS Service]\nName=org.freedesktop.portal.Desktop\nExec=" + command + "\n")
+        env["XDG_DATA_HOME"] = str(tmp_path)
     result = subprocess.run(["dbus-run-session", "--", sys.executable, str(Path(__file__).resolve()), case],
-                            env={**os.environ, "XDG_SESSION_TYPE": "wayland", "WAYLAND_DISPLAY": "portal-test"},
+                            env=env,
                             capture_output=True, text=True, timeout=25)
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -27,6 +36,11 @@ async def scenario(case):
     from dbus_next.aio import MessageBus
     from mouse_invisivel.wayland import (PortalConnection, PortalError, SERVICE, PATH, REMOTE,
                                         SHORTCUTS, SCREENCAST, SESSION, REQUEST, STOP_ID, values)
+    if case == "autostart":
+        from mouse_invisivel.wayland import probe
+        info = await probe()
+        assert info["available"] and info["consent_requested"] is False, info
+        return
     fake = await MessageBus().connect()
     await fake.request_name(SERVICE)
     events, requests, closes = [], [], []
@@ -88,6 +102,9 @@ async def scenario(case):
         return Message.new_method_return(message, "o", [path])
 
     fake.add_message_handler(handle)
+    if case == "server":
+        await fake.wait_for_disconnect()
+        return
     stop = threading.Event()
     emergency, failures = [], []
     client = PortalConnection(stop, lambda: emergency.append("stop"), failures.append)

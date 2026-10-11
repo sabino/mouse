@@ -51,6 +51,13 @@ class PortalConnection:
 
     async def connect(self):
         self.bus = await asyncio.wait_for(MessageBus().connect(), 3)
+        # A property read permits normal D-Bus activation of an installed but idle
+        # service. GetNameOwner alone does not activate it and would give a false
+        # "unavailable" diagnostic. This read opens no session/consent dialog.
+        try:
+            await self.call("org.freedesktop.DBus.Properties", "GetAll", "s", [REMOTE])
+        except PortalError:
+            pass  # Missing RemoteDesktop is reported separately after service discovery.
         reply = await self.call("org.freedesktop.DBus", "GetNameOwner", "s", [SERVICE],
                                 path="/org/freedesktop/DBus", destination="org.freedesktop.DBus")
         self.owner = reply[0]
