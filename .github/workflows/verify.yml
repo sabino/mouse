@@ -26,13 +26,15 @@ jobs:
         run: |
           python -m venv .ci-venv
           if [ "$RUNNER_OS" = "Windows" ]; then
-            echo "$PWD/.ci-venv/Scripts" >> "$GITHUB_PATH"
+            python -c "from pathlib import Path; print(Path('.ci-venv/Scripts').resolve())" >> "$GITHUB_PATH"
           else
             echo "$PWD/.ci-venv/bin" >> "$GITHUB_PATH"
           fi
       - name: Install Linux desktop libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgl1 libegl1 libxcb-cursor0 libxkbcommon-x11-0
+      - name: Verify the isolated interpreter
+        run: python -c "import sys; print(sys.executable); assert sys.prefix != sys.base_prefix"
       - name: Install pinned dependencies
         run: python -m pip install --require-hashes -r requirements-dev.lock
       - name: Install project without resolving dependencies

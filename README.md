@@ -77,8 +77,9 @@ uv run --locked python scripts/build.py
 ```
 
 O workflow testa e gera artefatos nativos nos runners Windows/macOS/Linux. Cada build deve
-ser executado no próprio sistema; não é cross-compile. Artefatos unsigned/ad-hoc estão na
-aba Actions do repositório privado, sem publicar release. Pesos `.task` e dados pessoais
+ser executado no próprio sistema; não é cross-compile. O upload de artefatos unsigned/ad-hoc para Actions está bloqueado pela quota de
+armazenamento da conta (issue #7); o pacote Linux local permanece no Cloud em `dist/`.
+Não há release publicada. Pesos `.task` e dados pessoais
 não entram no pacote. CLI `--smoke-test` abre/fecha a interface sem câmera/entrada.
 
 [Estado de validação](docs/VALIDATION.md) separa testes sintéticos/simulados, GUI headless,
