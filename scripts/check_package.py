@@ -27,4 +27,4 @@ with tempfile.TemporaryDirectory(prefix="mouse-package-test-") as folder:
     replay = json.loads(result.stdout)
     assert replay["native_input"] is False
     assert any("click" in e["actions"] for e in replay["events"])
-print("Frozen capture-format → train → evaluate → JSON reload → policy replay: synthetic fixtures only.")
+print("Frozen capture-format -> train -> evaluate -> JSON reload -> policy replay: synthetic fixtures only.")
