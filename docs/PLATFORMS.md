@@ -27,6 +27,10 @@ old or out-of-order frames and inference errors stop actions. Stale capture time
 include capture+inference latency; OpenCV buffer size is best-effort, not proof that a
 particular camera driver delivered a fresh sensor image. Confirm latency physically.
 
+Invalid/degenerate feature windows and hand switches now emit release, disarm and clear
+feature history; only initial incomplete windows use warm-up. A reduced feature window
+while dragging also fails closed.
+
 The input worker runs separately from capture/inference/UI, rejects stale queued commands,
 and releases only buttons it owns after >350 ms without fresh command timestamps. Pause
 increments a shared generation so queued earlier actions cannot reactivate. The worker
@@ -36,7 +40,12 @@ new actions and safely release an app-held drag. Stable neutral re-arms episodes
 Esc reception test is required before activation. App-window Esc and the stop button always
 pause. The worker can release on a hung/crashed parent while alive; forced killing of the
 worker, OS failures or permission revocation that also prevents release are unavoidable
-limitations. No claim that finally handles every crash. Release failures are surfaced.
+limitations. The worker is non-daemon and acknowledges completed release. Closing remains pending
+with controls disabled if cleanup exceeds its wait; the GUI closes only after acknowledgement
+and worker completion. Failed releases remain owned and are retried; no timeout forcibly
+terminates cleanup. OS/app quit requests stop fresh input, and Python waits for the
+non-daemon worker. Forced OS termination still cannot be made safe by a finally block.
+Release failures are surfaced; restore permission/focus if native release is rejected.
 
 Manual acceptance, on EACH real target platform:
 1. Install/build, obtain licensed landmarks, open preview. Check mirrored handedness and

@@ -99,6 +99,8 @@ class Window(QMainWindow):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(30)
+        self.shutdown_timer = QTimer(self)
+        self.shutdown_timer.timeout.connect(self.finish_shutdown)
         self.setStyleSheet(
             "QWidget{color:#e9edf2;background-color:#20262f;}"
             "QLabel{font-size:13px;background:transparent;}"
@@ -818,5 +820,28 @@ class Window(QMainWindow):
         self.timer.stop()
         self.stop_camera()
         if self.input and not self.input.close():
-            self.message("Processo de entrada ainda finalizando liberação. Reinicie antes de nova ativação.")
+            self.centralWidget().setEnabled(False)
+            self.message("Fechamento pendente: aguardando liberação de botões e conclusão do processo de entrada.")
+            self.shutdown_timer.start(100)
+            event.ignore()
+            return
+        self.shutdown_timer.stop()
         event.accept()
+
+    def finish_shutdown(self):
+        if self.input:
+            for kind, detail in self.input.poll():
+                if kind == "error":
+                    self.message("Fechamento pendente: " + detail)
+            if self.input.process.is_alive():
+                return
+        self.close()
+
+    def request_shutdown(self):
+        # Also stop fresh commands if the application exits through an OS/app quit path.
+        # Non-daemon ownership makes Python wait for worker cleanup instead of killing it.
+        self.pause()
+        if self.input:
+            self.input.stop.set()
+        if self.camera:
+            self.camera.stop_event.set()

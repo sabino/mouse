@@ -65,6 +65,7 @@ def main():
     app = QApplication([])
     app.setApplicationName("Mouse Invisível")
     window = Window()
+    app.aboutToQuit.connect(window.request_shutdown)
     window.show()
     if args.smoke_test:
         QTimer.singleShot(100, window.close)

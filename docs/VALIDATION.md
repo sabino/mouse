@@ -6,8 +6,8 @@ validation. A working headless build is not proof of real hardware usability.
 | State | Evidence | Limit |
 |---|---|---|
 | Built core | `dev` ee11dba3facb3ca86200ac58fa88529f7d62899d, draft PR #5 | Desktop is stacked on feat/desktop |
-| Unit/synthetic replay | 16 local tests passing + 2 native bridge/ABI tests skipped on Linux, classifier numeric round-trip checked against sklearn | Mathematical fixtures, not recorded physical hand data |
-| Mocked input | Ownership, partial native failure, stale timestamps, watchdog, neutral/rejection, Wayland refusal | No physical input/camera |
+| Unit/synthetic replay | 19 local tests passing + 2 native bridge/ABI tests skipped on Linux, classifier numeric round-trip checked against sklearn | Mathematical fixtures, not recorded physical hand data |
+| Mocked input | Ownership, partial native failure, stale timestamps, watchdog, neutral/rejection, degenerate-feature/hand-switch drag release, delayed production-worker shutdown, Wayland refusal | No physical input/camera |
 | Headless desktop | Qt offscreen capture/label/train/reload/preview test + GUI smoke | Synthetic packet; no real camera/model detection |
 | Core CI | https://github.com/sabino/mouse/actions/runs/38168215710 successful | Three OS test jobs, 11 core tests; not physical input |
 | Linux native package | PyInstaller directory built and diagnostics/GUI smoke passed locally | Cloud Linux, headless; frozen worker probe and synthetic train/reload/replay also passed |
