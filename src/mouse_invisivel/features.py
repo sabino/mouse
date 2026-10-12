@@ -27,6 +27,7 @@ class Frame:
             raise ValueError("Invalid landmark frame")
 
     def to_dict(self):
+        self.__post_init__()  # Mutable frames must remain loadable when exported.
         return {"timestamp": self.timestamp, "points": self.points.tolist(), "hand": self.hand}
 
     @classmethod

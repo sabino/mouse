@@ -87,7 +87,9 @@ def test_unsafe_model_and_nonfinite_rejected(tmp_path):
         Model.load(p)
     model = train([fixture_session("s1"), fixture_session("s2")], ["s2"])
     model.scale[0] = 0
-    model.save(p)
+    with pytest.raises(ValueError):
+        model.save(p)
+    write_json(p, model.to_dict())  # Deliberately malformed schema fixture for loader validation.
     with pytest.raises(ValueError):
         Model.load(p)
 
