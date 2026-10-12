@@ -4,35 +4,34 @@ Clip labels are episode ground truth, not expert timestamp annotations. Precisio
 recall and detection latency are therefore coarse personal-clip diagnostics.
 """
 import numpy as np
-from .features import windows
-from .safety import Policy, DEFAULT_MAPPING
+from .safety import DEFAULT_MAPPING
+from .runtime import Runtime
+from .profile import Profile
 
 
-def evaluate_events(model, sessions, threshold, margin, dwell):
+def evaluate_events(model, sessions, threshold, margin, dwell, mapping=None):
     tp = fp = fn = idle_events = 0
     idle_seconds = 0.
     latencies = []
     action_names = {"click", "secondary", "drag", "release", "scroll_up", "scroll_down"}
     for session in sessions:
-        policy = Policy(dwell=dwell)
-        previous_end = -1.
+        runtime = Runtime(Profile(confidence=threshold, margin=margin, dwell=dwell,
+                                  mapping=mapping or DEFAULT_MAPPING.copy()), model)
         for clip in session.clips:
             start, end = clip.frames[0].timestamp, clip.frames[-1].timestamp
-            if start <= previous_end or start - previous_end > 0.75:
-                policy.reset()
-            previous_end = end
-            expected = DEFAULT_MAPPING.get(clip.label, "none")
+            expected = (mapping or DEFAULT_MAPPING).get(clip.label, "none")
             found = False
             idle = clip.label in ("neutral", "confusing")
             if idle:
                 idle_seconds += end - start
-            for timestamp, feature in windows(clip.frames):
-                label, _ = model.predict(feature, threshold, margin)
-                for action in policy.step(label, timestamp):
+            for frame in clip.frames:
+                timestamp = frame.timestamp
+                label, _, actions, _ = runtime.process(frame, now=timestamp)
+                for action in actions:
                     if action not in action_names:
                         continue
                     # Safety release is not a false action episode on idle/rejected states.
-                    if action == "release" and label in ("neutral", "confusing", "rejected"):
+                    if action == "release" and label in ("neutral", "confusing", "rejected", "lost"):
                         continue
                     if idle:
                         idle_events += 1

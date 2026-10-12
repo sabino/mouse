@@ -6,7 +6,9 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+artifacts/
 *.spec
 local-data/
 *.task
 coverage.xml
+.ci-venv/

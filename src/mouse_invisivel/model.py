@@ -101,7 +101,7 @@ def materialize(sessions):
     return np.stack(x), np.array(y)
 
 
-def train(sessions, holdout, kind="logistic", by_person=False, threshold=0.80, margin=0.15, dwell=0.15):
+def train(sessions, holdout, kind="logistic", by_person=False, threshold=0.80, margin=0.15, dwell=0.15, mapping=None):
     from sklearn.preprocessing import StandardScaler
     from sklearn.linear_model import LogisticRegression
     from sklearn.naive_bayes import GaussianNB
@@ -149,7 +149,7 @@ def train(sessions, holdout, kind="logistic", by_person=False, threshold=0.80, m
                          "confusion_labels": labels + ["rejected"],
                          "confusion_matrix": confusion_matrix(yt, pred, labels=labels + ["rejected"]).tolist(),
                          "rejection_rate": float(np.mean(np.array(pred) == "rejected")),
-                         "events": evaluate_events(model, test_sessions, threshold, margin, dwell)}
+                         "events": evaluate_events(model, test_sessions, threshold, margin, dwell, mapping)}
         models[name] = model
     if kind not in models:
         raise ValueError("Choose logistic or gaussian_nb before inspecting holdout results")
@@ -159,6 +159,8 @@ def train(sessions, holdout, kind="logistic", by_person=False, threshold=0.80, m
                      "holdout_sessions": [s.id for s in test_sessions], "split_by": "person" if by_person else "session",
                      "training_window_counts": counts, "holdout_window_count": len(yt),
                      "threshold": threshold, "margin": margin, "dwell_seconds": dwell,
+                     "event_mapping": mapping,
+                     "trained_hands": sorted({f.hand for s in train_sessions for c in s.clips for f in c.frames}),
                      "dependencies": {"numpy": np.__version__, "scikit-learn": sklearn.__version__},
                      "evidence": "synthetic-test only; no real-world accuracy" if any(
                          s.source == "synthetic-test" for s in sessions) else "locally recorded sessions; personal holdout only",

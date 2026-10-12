@@ -87,3 +87,18 @@ def test_wayland_explicitly_denied(monkeypatch):
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setenv("XDG_SESSION_TYPE", "wayland")
     assert not input_allowed()[0]
+
+
+def test_bounded_uncertain_transition_never_executes_and_eventually_disarms():
+    p = Policy()
+    neutral(p)
+    assert p.step("rejected", .3) == []
+    assert p.armed
+    p.step("click", .5)
+    assert p.step("click", .7) == ["click"]
+    neutral(p, .8)
+    assert p.step("rejected", 1.1) == []
+    assert p.step("rejected", 1.9) == []
+    assert not p.armed
+    p.step("click", 2.)
+    assert p.step("click", 2.2) == []

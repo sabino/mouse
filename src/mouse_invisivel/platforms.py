@@ -11,10 +11,12 @@ class Monitor:
     y: int
     width: int
     height: int
+    portal_stream: int | None = None
 
     def map(self, uv):
-        return (round(self.x + float(uv[0]) * (self.width - 1)),
-                round(self.y + float(uv[1]) * (self.height - 1)))
+        xy = (round(self.x + float(uv[0]) * (self.width - 1)),
+              round(self.y + float(uv[1]) * (self.height - 1)))
+        return (*xy, self.portal_stream) if self.portal_stream is not None else xy
 
     def to_dict(self):
         return asdict(self)
@@ -30,10 +32,15 @@ def set_dpi_awareness():
             ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
 
+def is_wayland():
+    return sys.platform.startswith("linux") and (os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
+                                                  or bool(os.environ.get("WAYLAND_DISPLAY")))
+
+
 def input_allowed():
     if sys.platform.startswith("linux"):
-        if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland" or os.environ.get("WAYLAND_DISPLAY"):
-            return False, "Native Wayland input unavailable; use an X11 session. Preview/training work."
+        if is_wayland():
+            return False, "Wayland requires explicit RemoteDesktop + GlobalShortcuts portal consent; use Autorizar portal. No XWayland fallback."
         if not os.environ.get("DISPLAY"):
             return False, "No X11 display. Preview/training need a desktop session."
     if sys.platform == "darwin":
@@ -47,6 +54,8 @@ def input_allowed():
 
 
 def monitors():
+    if is_wayland():
+        return []  # Only consented compositor-space portal coordinates are valid.
     if sys.platform == "win32":
         import ctypes
         from ctypes import wintypes
@@ -243,8 +252,12 @@ def diagnostics():
         screen_error = None
     except Exception as e:
         screens, screen_error = [], str(e)
+    portal = None
+    if is_wayland():
+        from .wayland import probe_sync
+        portal = probe_sync()
     return {"platform": sys.platform, "session_type": os.environ.get("XDG_SESSION_TYPE", "unknown"),
             "input_preflight": allowed, "input_detail": reason, "monitors": screens,
             "monitor_error": screen_error, "camera": "Not opened; explicit preview required",
             "camera_privacy": "No raw recording/upload. Denial/revocation/unplug cause pause.",
-            "manual_validation": "Not established by this diagnostic"}
+            "wayland_portal": portal, "manual_validation": "Not established by this diagnostic"}
