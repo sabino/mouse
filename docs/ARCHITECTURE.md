@@ -31,3 +31,10 @@ Primary documentation consulted 2026-10-11:
 - https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput
 - https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html
 - https://pyinstaller.org/en/stable/
+
+Repository bootstrap evidence: first remote branch `dev`, initial SHA
+1a3495b3308fbcedabb849b4fe69a3b29d1b58e6. The same minimal commit was then pushed
+as `main`. GitHub rejected the first local bootstrap attempt for private email
+protection; the unpublished commit was amended to the account's noreply email,
+with no setting/visibility/permission changes. CLI GitHub API authentication was
+unavailable, but git transport and the authorized GitHub connector worked.
