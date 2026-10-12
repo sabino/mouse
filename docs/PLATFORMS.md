@@ -1,107 +1,112 @@
-# Platform behavior and physical acceptance
+# Plataformas e permissões
 
-Windows calls SetProcessDpiAwarenessContext (per-monitor v2) before Qt/monitor queries.
-EnumDisplayMonitors gives physical rectangles, including negative coordinates. SendInput
-absolute motion uses the entire physical virtual desktop. Its return count is checked;
-UIPI/high-integrity applications, locked screens and secure desktops are not bypassed.
-No automatic administrator elevation. Windows artifacts are unsigned directory builds.
+[Índice](README.md) · [Instalação](INSTALLATION.md) · [Aceitação física](VALIDATION.md)
 
-macOS uses native Quartz global display bounds/cursor points (Retina backing pixels are
-not multiplied into pointer coordinates). AXIsProcessTrusted is checked without prompting
-or granting permission. Camera errors become visible and pause control; enable Camera in
-Privacy & Security manually. The global Esc listener may require Input Monitoring as well
-as Accessibility. Verify Esc physically before activation. Camera permission applies to the
-running binary/interpreter; moving/rebuilding an app can require renewed permission. Native
-app bundles carry NSCameraUsageDescription and are locally ad-hoc signed; not notarized.
+## Matriz de suporte
 
-Linux requires an X11 display and XTest for input. XRandR monitor rectangles are physical
-server coordinates; old servers fall back to one full-root virtual desktop. `pynput` is
-not presented as a native Wayland adapter. WAYLAND_DISPLAY or XDG_SESSION_TYPE=wayland
-selects the consent-only XDG portal worker, never XWayland. Preview/label/train also work
-when portals are unavailable. No uinput permissions/groups or root access are used.
+| Ambiente | Implementação | Estado de validação |
+| --- | --- | --- |
+| Windows x64 | `SendInput`, DPI por monitor e desktop virtual | Testes/build/package em Windows CI; câmera e entrada físicas pendentes |
+| macOS ARM | Quartz e bridge de Acessibilidade | Testes/build/package em macOS CI; permissões e hardware pendentes |
+| macOS Intel | Dependências com marcador Intel e adaptador Quartz | Precisa de build e validação nesse hardware |
+| Linux x64 / X11 | XTest, XRandR e stop global | Testes/build/package em Linux CI; hardware pendente |
+| Wayland com backend compatível | Portais RemoteDesktop, ScreenCast e GlobalShortcuts | Protocolo com backend simulado; compositor físico pendente |
+| Sway / wlr atual | Portais necessários ausentes | Entrada nativa indisponível; prévia/coleta/treino disponíveis |
 
-## Wayland consent and Sway capability blocker
+O aplicativo não concede permissões persistentes automaticamente, eleva privilégios ou
+modifica configuração de compositor. Diagnóstico é uma consulta de capacidades, não um
+teste físico nem uma autorização de entrada.
 
-Click **Autorizar portal / testar parada global** to request only POINTER through
-RemoteDesktop (`persist_mode=0`, no restore tokens), monitor coordinate metadata through
-ScreenCast, and a GlobalShortcuts emergency binding. The desktop displays its consent
-dialogs and lets the user choose the stop shortcut (preferred Ctrl+Alt+Shift+Esc). The
-app requests no keyboard injection and never calls OpenPipeWireRemote or reads screen
-pixels. Screen-sharing authorization is still part of the portal dialog: decline it
-if unwanted; the app keeps live input disabled. Diagnostics/CLI `--check-portal` inspect
-capabilities without CreateSession, Start or any consent/input.
+## Windows
 
-All three interfaces must exist, POINTER must be granted, compositor monitor sizes and
-positions must be returned, and the emergency binding must be described. Physically test
-the displayed global shortcut before activation. Esc in the focused app is an additional
-local stop, not the Wayland global binding. Permissions denied/cancelled/expired, missing
-coordinates, service disappearance/restart, revoked sessions or changed stop binding
-fail closed. App-held releases are sent while the remote pointer session remains valid;
-once the compositor destroys the session, its virtual-input teardown owns cleanup.
-That last condition must be physically tested and is not proven by the fake portal.
+O processo solicita DPI per-monitor v2 antes de criar a interface. Os monitores usam
+retângulos físicos; movimento absoluto é normalizado pelo desktop virtual, incluindo
+origens negativas. `SendInput` tem retorno verificado.
 
-Absolute motion targets the selected stream using compositor coordinates, including
-negative monitor origins and distinct IDs for mirrored monitors; no physical-pixel/DPI
-guessing. Qt-observed display layout/DPI changes pause, stop the portal worker and require
-reauthorization/recalibration. Backend hotplug/revocation handling needs physical tests.
+Aplicativos de integridade maior, telas bloqueadas e desktops seguros podem rejeitar a
+entrada. Não há elevação automática ou bypass de UIPI. Pacotes são diretórios unsigned.
+Teste escala 100/150/200%, monitores mistos e mudança de layout na aceitação física.
 
-**Sway limitation:** upstream xdg-desktop-portal-wlr currently implements only Screenshot
-and ScreenCast, not RemoteDesktop or GlobalShortcuts. Installing/forcing another backend
-does not establish Sway compositor support. Missing capabilities are reported explicitly;
-we do not edit portal/Sway configuration or weaken security. This is a real backend
-capability blocker for native Sway input, tracked in issue #8. A supported compositor
-backend or future Sway portal implementation is required. No Sway usability is claimed.
+## macOS
 
-Primary sources (checked 2026-10-11):
-- https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html
-- https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.GlobalShortcuts.html
-- https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.ScreenCast.html
-- https://raw.githubusercontent.com/emersion/xdg-desktop-portal-wlr/master/wlr.portal
+Quartz usa coordenadas globais em pontos, inclusive em Retina. A leitura de
+`AXIsProcessTrusted` não solicita nem concede Acessibilidade. O usuário pode precisar
+autorizar Câmera, Acessibilidade e Monitoramento de Entrada para o processo que está
+executando. Trocar/recompilar o binário pode exigir rever essas permissões.
 
-Private D-Bus tests exercise real message signatures/async responses with a fake portal
-and the production spawned worker. They grant no OS access and do not prove GNOME/KDE/
-Sway or hardware input operation. Some backends may reject standalone interpreter app
-identity; surface that denial, never spoof identity or bypass it.
+O bundle contém explicação de uso da câmera e assinatura ad-hoc local; não está notarizado.
+Denial/revogação/erro deve pausar a entrada. Verifique o stop global fisicamente com outro
+aplicativo em foco; a presença da bridge em CI não comprova a permissão no computador.
 
-Camera index changes, handedness/profile/model changes, capture/training/calibration,
-explicit pause and shutdown all pause input. Missing/wrong/ambiguous hand, tracking gaps,
-old or out-of-order frames and inference errors stop actions. Stale capture timestamps
-include capture+inference latency; OpenCV buffer size is best-effort, not proof that a
-particular camera driver delivered a fresh sensor image. Confirm latency physically.
+## Linux X11
 
-Invalid/degenerate feature windows and hand switches now emit release, disarm and clear
-feature history; only initial incomplete windows use warm-up. A reduced feature window
-while dragging also fails closed.
+Entrada exige display X11 e extensão XTest. XRandR fornece os monitores; servidores mais
+antigos usam fallback para o retângulo total do desktop virtual. Não há backend `uinput`,
+alteração de grupos/permissões de dispositivo ou necessidade de executar o app como root.
 
-The input worker runs separately from capture/inference/UI, rejects stale queued commands,
-and releases only buttons it owns after >350 ms without fresh command timestamps. Pause
-increments a shared generation so queued earlier actions cannot reactivate. The worker
-checks listener health, permission preflight and native monitor topology. Display changes
-pause and require refreshed diagnostics. Invalid/uncertain gesture predictions produce no
-new actions and safely release an app-held drag. Stable neutral re-arms episodes. A global
-Esc reception test is required before activation. App-window Esc and the stop button always
-pause. The worker can release on a hung/crashed parent while alive; forced killing of the
-worker, OS failures or permission revocation that also prevents release are unavoidable
-limitations. The worker is non-daemon and acknowledges completed release. Closing remains pending
-with controls disabled if cleanup exceeds its wait; the GUI closes only after acknowledgement
-and worker completion. Failed releases remain owned and are retried; no timeout forcibly
-terminates cleanup. OS/app quit requests stop fresh input, and Python waits for the
-non-daemon worker. Forced OS termination still cannot be made safe by a finally block.
-Release failures are surfaced; restore permission/focus if native release is rejected.
+## Wayland por consentimento
 
-Manual acceptance, on EACH real target platform:
-1. Install/build, obtain licensed landmarks, open preview. Check mirrored handedness and
-   no input until explicit activation. Verify no network traffic/raw file recording.
-2. Capture real positives/neutral/confusing movements over separate days. Train, inspect
-   holdout event/idle diagnostics, save/reload profile/model and run preview trials.
-3. Calibrate five comfortable-range targets. Test chosen monitor, negative origins,
-   100/150/200% scaling, Retina/mixed DPI and sensitivity/smoothing. Change monitor layout
-   while dragging: expect pause/release and explicit restart.
-4. Verify Esc globally while another application is focused. Then test pointer, primary,
-   secondary, drag/release, scroll and custom mappings in a disposable drawing app.
-5. Cover one/multiple hands, wrong handedness, partial/confusing poses, low confidence,
-   repeated gesture without neutral, camera cover/unplug/reconnect, access denial/revocation,
-   sleep/resume, CPU stall and deliberate inference/UI hang. Check app-held release.
-6. Check lower/higher-integrity Windows targets, macOS permission changes, X11 permission/
-   display loss, native Wayland refusal. Record latency, idle false activations and user
-   observations; do not infer success from CI or the mock adapter.
+`WAYLAND_DISPLAY` ou `XDG_SESSION_TYPE=wayland` seleciona o worker de portais. Mesmo com
+um `DISPLAY` de XWayland disponível, ele não é usado como fallback de controle nativo.
+
+Ao clicar **Autorizar portal / testar parada global**, o aplicativo solicita:
+
+1. **RemoteDesktop:** somente ponteiro, `persist_mode=0`, sem restore tokens.
+2. **ScreenCast:** seleção de monitores para metadados de coordenadas/identidade.
+3. **GlobalShortcuts:** uma parada global escolhida pelo desktop; sugestão Ctrl+Alt+Shift+Esc.
+
+O diálogo pode pedir compartilhamento de monitor. O aplicativo nunca chama
+`OpenPipeWireRemote` nem lê pixels da tela; não pede injeção de teclado. É possível recusar
+o consentimento e continuar em prévia/treinamento. Confira o atalho retornado e teste-o
+fisicamente antes de ativar; Esc com a janela em foco é apenas uma parada local adicional.
+
+As três interfaces, permissão de ponteiro, coordenadas válidas de monitor e um binding de
+stop descrito são necessárias. Cancelamento, timeout, recusa, sessão revogada, serviço
+reiniciado/desaparecido ou binding alterado bloqueiam o controle. Mudanças de layout/DPI
+observadas pelo Qt param o worker e invalidam a calibração.
+
+Movimento absoluto usa coordenadas do compositor e ID do stream selecionado, preservando
+origens negativas e identidade de monitores espelhados. Enquanto a sessão remota for
+válida, o aplicativo tenta liberar seus botões por esse canal. Depois que o compositor
+destrói a sessão, a limpeza do dispositivo virtual pertence ao compositor: esse caso
+precisa de validação física. Alguns backends podem recusar a identidade de um interpretador
+standalone; a recusa é reportada, sem forjar identidade ou contornar a política.
+
+### Limitação atual do Sway
+
+O backend upstream `xdg-desktop-portal-wlr` anuncia somente Screenshot e ScreenCast.
+RemoteDesktop e GlobalShortcuts não estão nessa lista. Instalar ou forçar outro backend
+não demonstra suporte no compositor Sway. Controle nativo exige uma implementação que
+realmente ofereça essas capacidades; não há esse aceite registrado no projeto.
+
+Verifique o ambiente sem solicitar consentimento:
+
+```sh
+uv run --locked mouse-invisivel --check-portal
+```
+
+O resultado informa interfaces faltantes ou indisponibilidade do serviço/bus. Os testes
+do repositório usam um D-Bus privado real com portal simulado; não são testes de Sway.
+
+## Falhas e parada
+
+Mão ausente/errada/ambígua, frames antigos/fora de ordem, landmarks degenerados e erros
+de inferência interrompem ações. Erros de câmera ou desconexão aparecem na prévia e
+pausam o controle. Buffering do driver e latência total precisam de medição real.
+
+O worker tenta liberar somente botões que o aplicativo possui. Liberações que falham
+permanecem pendentes e são tentadas novamente; o fechamento pode aguardar limpeza.
+Nenhum timeout força o encerramento desse processo. Término forçado, falha do sistema
+e revogação que também impeça liberar entrada não têm garantia de recuperação por software.
+
+Registre sistema, câmera, escalas, monitores, permissões e resultados conforme o
+[protocolo de aceitação](VALIDATION.md).
+
+## Fontes primárias
+
+- [Limitações do pynput](https://pynput.readthedocs.io/en/latest/limitations.html)
+- [Windows SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
+- [RemoteDesktop](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html)
+- [GlobalShortcuts](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.GlobalShortcuts.html)
+- [ScreenCast](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.ScreenCast.html)
+- [Interfaces do backend wlr](https://raw.githubusercontent.com/emersion/xdg-desktop-portal-wlr/master/wlr.portal)

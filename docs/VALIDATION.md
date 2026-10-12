@@ -1,52 +1,72 @@
-# Verification evidence
+# Validação e critérios de aceitação
 
-Snapshot 2026-10-12. This environment has no physical camera or interactive OS-input
-validation. A working headless build is not proof of real hardware usability.
+[Índice](README.md) · [Plataformas](PLATFORMS.md) · [Roadmap](ROADMAP.md)
 
-| State | Evidence | Limit |
-|---|---|---|
-| Built core | `dev` 3af89a2abb069c36fc9aaef5bd7b487cf6abd8bf, PR #5 | Main integration and desktop PR #6 state are recorded in PR comments |
-| Unit/synthetic replay | 43 local tests passing + 2 native bridge/ABI tests skipped on Linux, classifier numeric round-trip checked against sklearn | Mathematical fixtures, not recorded physical hand data |
-| Mocked input | Ownership, partial native failure, stale timestamps, watchdog, neutral/rejection, degenerate-feature/hand-switch drag release, delayed production-worker shutdown, Wayland refusal | No physical input/camera |
-| Headless desktop | Qt offscreen capture/label/train/reload/preview test + GUI smoke | Synthetic packet; no real camera/model detection |
-| Core CI | https://github.com/sabino/mouse/actions/runs/38198463681 successful at 3af89a2 | Three OS core/safety/schema jobs; not physical input |
-| Linux native package | PyInstaller directory built and diagnostics/GUI smoke passed locally | Cloud Linux, headless; frozen worker probe and synthetic train/reload/replay also passed |
-| Desktop/native CI before portals | https://github.com/sabino/mouse/actions/runs/38170728954 at 96c38ef: all three source/native/frozen checks passed; Linux 19 pass/2 skip, macOS/Windows 20 pass/1 skip | Workflow red solely on upload quota; latest PR check/comments report subsequent portal head |
-| Physical camera/input | NOT TESTED on macOS/Windows/Linux | Requires user's hardware + real personally recorded sessions |
-| Native Wayland protocol | 11 private D-Bus cases: fake portal, actual dbus-daemon/service activation and production spawned worker; no OS consent/input | Physical compositor not tested; Sway/wlr lacks RemoteDesktop/GlobalShortcuts (issue #8) |
-| Reference analysis | Transcript inaccessible | No timestamps/algorithm details inferred |
-| Hand Landmarker weights | Follow-up request failed at proxy CONNECT: Tunnel connection failed: 403 Forbidden | No model-server response/bytes; no bypass; license still unverified |
-| GitHub artifact delivery | Historical private-repository uploads hit storage quota; the owner made the repo public | New archives preserve Unix executable bits/symlinks and include provenance/hash. Actual download evidence is attached to #6/#7; do not infer delivery from source checks |
-| Private Library delivery | Supported helper retry failed on hosted apps tools/list network | No saved Library file/link returned; preserved 96c38ef archive checksum in #7 |
-| Distribution license/signing | Inventory generated; final embedded native/Qt notices review and signing pending | Draft Actions/local artifacts only; no release published |
+## Evidência disponível
 
-Actual-hand replay can run with no OS input:
+Referência funcional: commit `26f02722c1882777c3839426f8d4dea00f2242ca` de `main`,
+verificado em 12 de outubro de 2026. A [execução pós-integração](https://github.com/sabino/mouse/actions/runs/38200339111)
+passou nos três sistemas, incluindo build, testes do pacote, validação do arquivo e upload.
+Para estados posteriores, consulte [Actions de `main`](https://github.com/sabino/mouse/actions?query=branch%3Amain).
 
-```sh
-mouse-invisivel --replay session.json --model gesture-model.json --profile profile.json
-```
+| Tipo de evidência | O que foi verificado | O que não demonstra |
+| --- | --- | --- |
+| Unitários / ML sintético | Features, separação de dados, parâmetros JSON e equivalência numérica com scikit-learn | Acurácia com mãos reais ou generalização |
+| Runtime / entrada simulada | Neutral/rejeição, staleness, watchdog, posse/liberação, falhas e fechamento atrasado | Resposta física do dispositivo/compositor |
+| Replay | Sessões no formato persistido, política e releases em gaps/timestamps fora de ordem | Dataset real já capturado ou latência do sensor |
+| GUI headless | Coleta/rotulação/treino/preview, orçamento de frames, perfis e reload | Uso com câmera, permissões ou monitor físicos |
+| Protocolo Wayland | Onze cenários em D-Bus privado real com portal simulado e worker de produção | Funcionamento no Sway ou em outro compositor real |
+| Diagnóstico nativo | Bridge macOS e ABI/coordenadas Windows sem injeção | Permissão de câmera/entrada concedida ou uso real |
+| Build / pacote nativo | Imports, GUI sem dispositivos, worker de gravação simulada, treino/reload/replay e arquivos | Usabilidade física ou aprovação para release |
+| Entrega | Três uploads e downloads de artefatos via GitHub concluídos | Execução pós-download no computador do usuário |
 
-CLI training uses the same pipeline as the desktop and also injects no input:
+Na referência acima, Linux x64 passou **43 testes** e pulou dois checks de outra plataforma.
+macOS ARM e Windows x64 passaram **33 testes** e pularam doze checks esperados de outra
+plataforma, incluindo os cenários Linux. Os skips não são aceites físicos.
 
-```sh
-mouse-invisivel --train session1.json session2.json --holdout SESSION2_ID --output gesture-model.json
-```
+Os downloads retornaram referências ZIP utilizáveis. A transferência dessas referências
+para o ambiente Cloud foi bloqueada; não se afirma execução pós-download nesse ambiente.
+Os executáveis foram testados em seus respectivos runners nativos.
 
-Tests synthesize mathematical fixtures explicitly marked `synthetic-test`; they never
-become product example data. Real event/idle metrics exist only after recording actual
-sessions. Before calling any platform usable, complete [manual checks](PLATFORMS.md)
-and attach observations/diagnostics, camera model, display layout, OS version and permission
-states to #1/#4/#7. Capture sensor-buffer freshness and whole-system latency cannot be proven
-in this Cloud. Emergency stop must be physically verified before each new input worker.
+## Regressões cobertas
 
-Review regressions cover oversized UTF-8 JSON preserving the prior file, exact byte
-boundaries, 32/33 model classes and mappings, 1000/1001 session clips, constant-feature
-Gaussian numeric persistence, replay drag release on gaps/out-of-order frames and GUI
-capture budgets with a reloadable saved session. Saves use the same schemas as loaders;
-the data schema/byte limits are enforced before atomic replacement.
+- Release/desarme em landmarks degenerados, troca de mão, tracking perdido e frames antigos.
+- Replay preservando releases após arraste em lacunas e timestamps fora de ordem.
+- Cleanup do worker de produção com liberação atrasada/falha temporária; janela aguarda confirmação.
+- Limites exatos de UTF-8, 32/33 classes/mapeamentos e 1000/1001 clipes, preservando arquivos anteriores.
+- Persistência finita de Gaussian NB com exemplos de features constantes.
+- Coleta limitada com sessão recarregável e perfil recarregável para modelo de 32 classes.
+- Recusa/cancelamento/revogação de portais, ativação do serviço, parada e coordenadas de monitores.
 
-Native packages use a tar archive on Linux/macOS (preserves launcher permissions and
-framework symlinks) and ZIP on Windows. Build/package guards require a clean, unchanged
-commit. Each archive includes BUILD-INFO.json and dependency licenses; artifact-index.json
-and SHA256SUMS.txt describe the exact native archive bytes. CI verifies archives before
-upload; maintainer review must also download them and confirm delivery independently.
+## O que continua pendente
+
+Não há dataset de mãos reais, replay desses dados, medição de acurácia real, câmera/entrada
+física, teste de revogação em hardware, monitor/DPI real ou latência completa aceitos.
+O `.task` licenciado ainda precisa ser obtido por canal permitido. O Sway/wlr atual não
+oferece os portais necessários. Termos dos pesos, revisão final de distribuição/assinatura
+e transcrição da referência permanecem pendentes.
+
+## Protocolo físico por ambiente
+
+Antes da avaliação, defina limites pessoais de erro/latência e registre sistema/versão,
+arquitetura, câmera, iluminação, mão, monitores/escalas, commit, arquivos/versões e permissões.
+Não registre uma etapa como aprovada sem observação real.
+
+| Etapa | Procedimento | Critério de aceitação |
+| --- | --- | --- |
+| Inicialização | Abrir app/preview e conferir handedness, sem ativar | Câmera/landmarks corretos; nenhuma entrada antes da ativação |
+| Dados e modelo | Sessões independentes com positivos/negativos; treino, holdout, save/reload | Métricas e erros registrados sem reutilizar holdout para uma alegação final |
+| Calibração | Cinco pontos; monitor escolhido, origens negativas, escalas e Retina/misto | Cursor testado dentro do alcance/limites previamente definidos |
+| Parada | Stop global com outro app em foco; teste antes de ativar | Stop recebido e botões do app liberados; reativação explícita |
+| Ações | Pointer, cliques, arraste/release, scroll e mapeamentos em aplicativo de teste | Ações observadas, repetição/neutral e falsos comandos registrados |
+| Falhas de câmera | Cobrir/desconectar/reconectar, negar/revogar acesso, mão errada/ambígua | Pausa visível e limpeza observada; recuperação explícita |
+| Falhas de execução | Carga de CPU, hang de inferência/UI, sleep/resume e fechamento durante arraste | Watchdog/cleanup observados; limitações do sistema documentadas |
+| Mudança de ambiente | DPI/layout/monitor, foco/integridade Windows, permissões macOS, display X11 | Pausa/diagnóstico e liberação observados, sem bypass de segurança |
+| Wayland | Capacidades e consentimento, binding, revogação, encerramento de sessão e hotplug | Backend real suportado e teardown físico confirmado; Sway não presumido |
+
+## Registro de resultado
+
+Guarde versão/commit, configuração, IDs das sessões reservadas, relatório, observações
+por etapa e falhas reproduzíveis. Informe limitações e o que não foi exercitado. Landmarks
+e modelos pessoais permanecem locais; compartilhar dados para investigação é uma escolha
+separada do usuário. O plano para encerrar essas pendências está em [ROADMAP](ROADMAP.md).
