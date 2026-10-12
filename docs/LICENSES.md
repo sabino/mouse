@@ -1,7 +1,8 @@
 # Dependency and model review (2026-10-11)
 
-The application is original and the repository remains private. No project-wide open
-source license is chosen on behalf of the owner. Third-party licenses still apply.
+The application is original. The owner made the repository public (verified 2026-10-12).
+No project-wide open source license is chosen on behalf of the owner; public visibility
+alone does not grant reuse rights. Third-party licenses still apply.
 Native artifacts are draft CI/local artifacts, not published releases.
 
 | Component | Pin | Upstream license / role | Delivery note |

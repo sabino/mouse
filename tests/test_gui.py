@@ -179,3 +179,47 @@ def test_wayland_display_change_stops_input_and_invalidates_calibration(tmp_path
     assert w.profile.calibration is None
     w.close()
     app.processEvents()
+
+
+def test_continuous_capture_stops_at_budget_and_remains_reloadable(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from mouse_invisivel import gui
+    from mouse_invisivel.dataset import Session
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(gui, "CAPTURE_SESSION_FRAMES", 60)
+    clock = [10.]
+    monkeypatch.setattr(gui.time, "monotonic", lambda: clock[0])
+    w = Window(tmp_path)
+    w.session.source = "synthetic-test"
+    rgb = np.zeros((50, 50, 3), dtype=np.uint8)
+    w.last_packet = Packet(0, clock[0], rgb, Frame(clock[0], fake_points("neutral")), "synthetic")
+    current = [w.last_packet]
+    w.camera = SimpleNamespace(latest=lambda: current[0], close=lambda: True)
+    w.label.setCurrentText("neutral")
+    w.start_sequence()
+    for n in range(1, 64):
+        clock[0] += 1/30
+        current[0] = Packet(n, clock[0], rgb, Frame(clock[0], fake_points("neutral")), "synthetic")
+        w.tick()
+    assert w.sequence_recording is None and not w.active
+    assert sum(len(c.frames) for c in w.session.clips) == 60
+    path = tmp_path / "bounded-session.json"
+    w.session.save(path)
+    assert sum(len(c.frames) for c in Session.load(path).clips) == 60
+    w.camera = None
+    w.close()
+    app.processEvents()
+
+
+def test_maximum_class_model_creates_reloadable_mapping_profile(tmp_path):
+    from mouse_invisivel.profile import Profile
+    from test_persistence_limits import numerical_model
+    app = QApplication.instance() or QApplication([])
+    w = Window(tmp_path)
+    w.set_model(numerical_model(32))
+    assert w.mapping.rowCount() == 32
+    w.apply_profile()
+    w.profile.save(tmp_path / "mapping.json")
+    assert len(Profile.load(tmp_path / "mapping.json").mapping) == 32
+    w.close()
+    app.processEvents()

@@ -12,7 +12,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                                QHeaderView, QProgressBar)
 from platformdirs import user_data_dir
 from .camera import Camera
-from .dataset import Session, Clip, DEFAULT_LABELS, label_valid
+from .dataset import (Session, Clip, DEFAULT_LABELS, label_valid, MAX_LABELS, MAX_CLIPS,
+                      CAPTURE_SESSION_FRAMES)
 from .model import Model, train
 from .profile import Profile
 from .runtime import Runtime
@@ -167,9 +168,11 @@ class Window(QMainWindow):
                                 "neutros, transições, poses parciais e gestos parecidos em confusing. Coleta sempre pausa entrada."))
         form = QFormLayout()
         self.person = QLineEdit("pessoa-local")
+        self.person.setMaxLength(128)
         form.addRow("Identificador da pessoa (opcionalmente pseudônimo)", self.person)
         self.label = QComboBox()
         self.label.setEditable(True)
+        self.label.lineEdit().setMaxLength(48)
         self.label.addItems(DEFAULT_LABELS)
         form.addRow("Rótulo do próximo exemplo", self.label)
         self.duration = QSpinBox()
@@ -188,6 +191,9 @@ class Window(QMainWindow):
         layout.addLayout(sequence_row)
         layout.addWidget(QLabel("Sequência: mude o rótulo explicitamente ao mudar o gesto, incluindo neutral entre ações.\n"
                                 "Mantenha cada rótulo por ≥2 s. Landmarks contínuos permitem avaliar episódios completos."))
+        layout.addWidget(QLabel(f"Limites: {MAX_LABELS} rótulos por modelo, {MAX_CLIPS} clipes por sessão, "
+                                f"{CAPTURE_SESSION_FRAMES} frames coletados por sessão (~200 s a 30 fps).\n"
+                                "Ao atingir o limite, a coleta para. Exporte e crie outra sessão; JSON tem limite de 32 MiB."))
         self.capture_progress = QProgressBar()
         self.capture_progress.setRange(0, 100)
         layout.addWidget(self.capture_progress)
@@ -240,6 +246,7 @@ class Window(QMainWindow):
         layout = tab(tabs, "4 · Perfil e calibração")
         form = QFormLayout()
         self.profile_name = QLineEdit(self.profile.name)
+        self.profile_name.setMaxLength(128)
         form.addRow("Nome do perfil", self.profile_name)
         self.monitor = QComboBox()
         form.addRow("Monitor de destino", self.monitor)
@@ -405,7 +412,9 @@ class Window(QMainWindow):
         self.runtime = Runtime(p, self.model)
 
     def refresh_mapping(self):
-        labels = sorted(set(self.profile.mapping) | set(self.model.labels if self.model else DEFAULT_LABELS))
+        # A loaded model needs only its own labels. Retaining unrelated default/old
+        # labels could make a valid 32-class model generate an unloadable profile.
+        labels = sorted(self.model.labels if self.model else self.profile.mapping)
         self.mapping.setRowCount(len(labels))
         for i, label in enumerate(labels):
             item = QTableWidgetItem(label)
@@ -427,6 +436,7 @@ class Window(QMainWindow):
             label = self.label.currentText().strip()
             if not label_valid(label):
                 raise ValueError("Rótulo: até 48 letras/números, _ ou -")
+            self.check_capture_limits(label)
             if self.recording or self.sequence_recording:
                 raise ValueError("Finalize ou cancele a coleta atual")
             if self.cal_target is not None:
@@ -446,6 +456,7 @@ class Window(QMainWindow):
             label = self.label.currentText().strip()
             if not label_valid(label):
                 raise ValueError("Escolha um rótulo válido")
+            self.check_capture_limits(label)
             self.sequence_recording = {"label": label, "frames": []}
             self.message("Sequência contínua: mude o rótulo ao mudar gesto. Inclua neutral entre ações; nenhum input.")
         except Exception as e:
@@ -455,6 +466,8 @@ class Window(QMainWindow):
         r = self.sequence_recording
         if r and r["frames"]:
             try:
+                if len(self.session.clips) >= MAX_CLIPS:
+                    raise ValueError("Limite de clipes: exporte e crie outra sessão")
                 from .features import windows
                 clip = Clip(r["label"], r["frames"])
                 if len(list(windows(clip.frames))) < 5:
@@ -463,6 +476,32 @@ class Window(QMainWindow):
                 self.refresh_clips()
             except ValueError as e:
                 self.message(str(e))
+
+    def captured_frames(self):
+        return (sum(len(c.frames) for c in self.session.clips)
+                + len(self.recording["frames"] if self.recording else [])
+                + len(self.sequence_recording["frames"] if self.sequence_recording else []))
+
+    def check_capture_limits(self, label):
+        if len(self.session.clips) >= MAX_CLIPS or self.captured_frames() >= CAPTURE_SESSION_FRAMES:
+            raise ValueError("Limite de sessão: exporte os exemplos e crie uma nova sessão independente")
+        if len({c.label for c in self.session.clips} | {label}) > MAX_LABELS:
+            raise ValueError(f"Limite de {MAX_LABELS} rótulos: reutilize um rótulo ou crie outro conjunto de treino")
+
+    def finish_recording(self):
+        r = self.recording
+        try:
+            from .features import windows
+            clip = Clip(r["label"], r["frames"])
+            if len(self.session.clips) >= MAX_CLIPS or len(list(windows(clip.frames))) < 5:
+                raise ValueError("Exemplo curto/irregular ou sessão cheia; exporte e grave novamente")
+            self.session.clips.append(clip)
+            self.refresh_clips()
+            self.message("Exemplo adicionado em memória. Salve a sessão para persistir/exportar.")
+        except ValueError as e:
+            self.message(str(e))
+        finally:
+            self.cancel_recording()
 
     def end_sequence(self):
         self.pause()
@@ -776,6 +815,12 @@ class Window(QMainWindow):
         image = QImage(rgb.data, rgb.shape[1], rgb.shape[0], rgb.strides[0], QImage.Format_RGB888).copy()
         self.video.setPixmap(QPixmap.fromImage(image).scaled(self.video.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
         frame = packet.landmark
+        if (self.recording or self.sequence_recording) and self.captured_frames() >= CAPTURE_SESSION_FRAMES:
+            if self.sequence_recording:
+                self.end_sequence()
+            else:
+                self.finish_recording()
+            self.message("Limite de frames atingido: segmentos válidos preservados em memória. Exporte e crie outra sessão.")
         if self.sequence_recording:
             current_label = self.label.currentText().strip()
             if frame is None or time.monotonic() - packet.timestamp > MAX_AGE or not label_valid(current_label):
@@ -784,8 +829,15 @@ class Window(QMainWindow):
             else:
                 if current_label != self.sequence_recording["label"]:
                     self.append_sequence_clip()
-                    self.sequence_recording = {"label": current_label, "frames": []}
-                self.sequence_recording["frames"].append(frame)
+                    self.sequence_recording = None
+                    try:
+                        self.check_capture_limits(current_label)
+                        self.sequence_recording = {"label": current_label, "frames": []}
+                    except ValueError as e:
+                        self.sequence_recording = None
+                        self.message(str(e))
+                if self.sequence_recording:
+                    self.sequence_recording["frames"].append(frame)
         if self.recording:
             r = self.recording
             now = time.monotonic()
@@ -797,17 +849,7 @@ class Window(QMainWindow):
                     r["frames"].append(frame)
                     self.capture_progress.setValue(min(100, int((now-r["start"])/(r["end"]-r["start"])*100)))
                     if now >= r["end"]:
-                        try:
-                            clip = Clip(r["label"], r["frames"])
-                            from .features import windows
-                            if len(list(windows(clip.frames))) < 5:
-                                raise ValueError("Exemplo curto/irregular; grave novamente")
-                            self.session.clips.append(clip)
-                            self.refresh_clips()
-                            self.message("Exemplo adicionado em memória. Salve a sessão para persistir/exportar.")
-                        except Exception as e:
-                            self.message(str(e))
-                        self.cancel_recording()
+                        self.finish_recording()
         if self.cal_target is not None and self.cal_target > 0 and time.monotonic() >= self.cal_target:
             try:
                 self.cal_points.append(self.current_frame().points[8, :2].tolist())

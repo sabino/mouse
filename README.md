@@ -18,7 +18,7 @@ Python 3.11 ou 3.12, sistema desktop de 64 bits. Com [uv](https://docs.astral.sh
 ```sh
 git clone https://github.com/sabino/mouse.git
 cd mouse
-git switch feat/desktop
+git switch main
 uv sync --locked --extra dev
 uv run --locked mouse-invisivel
 ```
@@ -69,7 +69,12 @@ neste Cloud, `CC=gcc` resolveu a ausência de clang. Não é usado uinput para c
    `scroll_down` rolam. O mapeamento é configurável. Esc/stop, perda de mão, atraso, mudança
    de perfil e erros pausam e tentam liberar apenas botões pressionados pelo app.
 
-É possível exportar e excluir sessões pela interface. Modelos/perfis são JSON locais
+Cada modelo aceita até 32 rótulos, incluindo neutral/confusing; cada sessão aceita até
+1.000 clipes e cada JSON até 32 MiB. A interface limita coleta a 6.000 frames por sessão
+(~200 s a 30 fps), preserva segmentos válidos e pede exportar/criar outra sessão ao atingir
+o limite. Gravações longas devem ser divididas em sessões independentes. Uma exportação
+inválida preserva o arquivo anterior. É possível exportar e excluir sessões pela interface.
+Modelos/perfis são JSON locais
 independentes; exclua-os no gerenciador de arquivos se quiser remover parâmetros derivados.
 Nenhuma permissão permanente é concedida automaticamente. O app exige teste físico do Esc
 antes de ativar (atalho autorizado pelo portal em Wayland); no macOS, conceda permissões
@@ -84,9 +89,13 @@ uv run --locked mouse-invisivel --diagnostics
 uv run --locked python scripts/build.py
 ```
 
-O workflow testa e gera artefatos nativos nos runners Windows/macOS/Linux. Cada build deve
-ser executado no próprio sistema; não é cross-compile. O upload de artefatos unsigned/ad-hoc para Actions está bloqueado pela quota de
-armazenamento da conta (issue #7); o pacote Linux local permanece no Cloud em `dist/`.
+O workflow testa e gera artefatos nativos nos runners Windows/macOS/Linux, inclusive em
+push para `main`. Cada build deve ser executado no próprio sistema; não é cross-compile.
+Builds exigem um checkout limpo. Os arquivos de Actions contêm `.tar.gz` no Linux/macOS
+(preservam execução e symlinks) e `.zip` no Windows, com `BUILD-INFO.json`, inventário de
+licenças, `artifact-index.json` e `SHA256SUMS.txt`. Após baixar/descompactar o arquivo de
+Actions, verifique `python scripts/verify_artifact.py PASTA` e extraia o pacote nativo.
+Uploads anteriores falharam por quota; a evidência de entrega atual está na issue #7.
 Não há release publicada. Pesos `.task` e dados pessoais
 não entram no pacote. CLI `--smoke-test` abre/fecha a interface sem câmera/entrada.
 
@@ -99,5 +108,6 @@ continua bloqueada por transcrição inacessível; nenhum detalhe foi inventado 
 código sem licença foi copiado. [Registro da referência](docs/REFERENCE.md).
 
 O primeiro branch remoto foi `dev`; `main` foi criado depois no commit mínimo para PRs.
-Nenhum PR foi merged e nenhuma release foi publicada. A implementação desktop completa
-fica em `feat/desktop` enquanto os dois draft PRs empilhados são revisados.
+Os PRs de core e desktop são integrados em `main` após revisão e verificação; o estado
+exato de integração/CI e os blockers estão nas issues e em [VALIDATION](docs/VALIDATION.md).
+O repositório foi tornado público pelo proprietário. Nenhuma release foi publicada.

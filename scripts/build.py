@@ -1,9 +1,12 @@
 """Build on the target OS; unsigned local artifact, no release/upload/deployment."""
 from pathlib import Path
+import json
 import subprocess
 import sys
 
 root = Path(__file__).resolve().parents[1]
+source_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+subprocess.run(["git", "diff", "--quiet", "HEAD"], cwd=root, check=True)
 args = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir",
         "--name", "MouseInvisivel", "--paths", str(root / "src"),
         "--collect-binaries", "mediapipe", "--collect-submodules", "mediapipe.tasks.python.vision",
@@ -34,3 +37,7 @@ if sys.platform == "darwin":
         plistlib.dump(info, f)
     # Updating Info.plist invalidates an ad-hoc signature; re-sign locally, no identity/network.
     subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(plist.parents[1])], check=True)
+if subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip() != source_sha:
+    raise RuntimeError("Source commit changed during build")
+subprocess.run(["git", "diff", "--quiet", "HEAD"], cwd=root, check=True)
+(root / "dist" / "build-source.json").write_text(json.dumps({"source_sha": source_sha}) + "\n")

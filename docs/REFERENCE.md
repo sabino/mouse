@@ -1,11 +1,11 @@
 # Reference video: evidence and blocker
 
 https://youtu.be/zmfJ6iwbW70 — MW Informática, “CRIEI UM MOUSE INVISÍVEL E FUNCIONA
-DE VERDADE”. Parent verified duration 13:17 and publication October 8, 2026.
-Parent inspected the expanded description and found no source-code/license link.
+DE VERDADE”. Verified duration 13:17 and publication October 8, 2026.
+The expanded description contains no source-code/license link.
 
-The parent could not read the transcript: the panel remained loading and browser
-export was inaccessible. On 2026-10-11 this environment's permitted web read also
+The transcript panel remained loading and browser export was inaccessible.
+On 2026-10-11 this environment's permitted web read also
 returned only the basic YouTube page (title/footer), with no transcript/captions.
 No access denial was bypassed. Timestamped analysis is blocked; no video-specific
 gestures, algorithms, implementation details or licensing are inferred.
