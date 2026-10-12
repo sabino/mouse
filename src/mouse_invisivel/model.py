@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 import numpy as np
 from .features import FEATURE_SCHEMA, FEATURE_DIM, windows
-from .dataset import label_valid
+from .dataset import label_valid, MAX_LABELS
 from .storage import read_json, write_json
 
 MODEL_SCHEMA = "gesture-model-v1"
@@ -51,19 +51,28 @@ class Model:
         return label, confidence
 
     def save(self, path):
-        write_json(path, {"schema": MODEL_SCHEMA, "feature_schema": FEATURE_SCHEMA,
+        d = self.to_dict()
+        self.from_dict(d)  # Use the loader's exact schema before replacing a file.
+        write_json(path, d)
+
+    def to_dict(self):
+        return {"schema": MODEL_SCHEMA, "feature_schema": FEATURE_SCHEMA,
                           "kind": self.kind, "labels": self.labels, "mean": self.mean.tolist(),
                           "scale": self.scale.tolist(), "params": {k: v.tolist() for k, v in self.params.items()},
-                          "report": self.report})
+                          "report": self.report}
 
     @classmethod
     def load(cls, path):
-        d = read_json(path)
+        return cls.from_dict(read_json(path))
+
+    @classmethod
+    def from_dict(cls, d):
         labels = d.get("labels", [])
         if (d.get("schema") != MODEL_SCHEMA or d.get("feature_schema") != FEATURE_SCHEMA
                 or d.get("kind") not in ("logistic", "gaussian_nb") or not isinstance(labels, list)
-                or not 3 <= len(labels) <= 32 or len(set(labels)) != len(labels)
-                or not all(label_valid(s) for s in labels) or not {"neutral", "confusing"} <= set(labels)):
+                or not 3 <= len(labels) <= MAX_LABELS or not all(label_valid(s) for s in labels)
+                or len(set(labels)) != len(labels) or not {"neutral", "confusing"} <= set(labels)
+                or not isinstance(d.get("report", {}), dict)):
             raise ValueError("Unsupported model/feature schema or labels")
         n = len(labels)
         mean, scale = array(d["mean"], (FEATURE_DIM,)), array(d["scale"], (FEATURE_DIM,))
@@ -106,6 +115,9 @@ def train(sessions, holdout, kind="logistic", by_person=False, threshold=0.80, m
     test_sessions = [s for s in sessions if key(s) in set(holdout)]
     if not train_sessions or not test_sessions:
         raise ValueError("Choose independent training and held-out sessions/persons")
+    declared_labels = {c.label for s in sessions for c in s.clips}
+    if len(declared_labels) > MAX_LABELS:
+        raise ValueError(f"Model class/label limit is {MAX_LABELS}; choose fewer gesture classes")
     # Partition full sessions BEFORE producing any overlapping windows.
     x, y = materialize(train_sessions)
     xt, yt = materialize(test_sessions)
@@ -126,8 +138,11 @@ def train(sessions, holdout, kind="logistic", by_person=False, threshold=0.80, m
         if name == "logistic":
             params = {"coef": estimator.coef_, "intercept": estimator.intercept_}
         else:
-            params = {"theta": estimator.theta_, "var": estimator.var_, "prior": estimator.class_prior_}
-        model = Model(name, list(estimator.classes_), scaler.mean_, scaler.scale_, params)
+            # Constant examples can make sklearn's data-derived smoothing epsilon zero.
+            # A positive numeric variance floor preserves a finite, reloadable classifier.
+            params = {"theta": estimator.theta_, "var": np.maximum(estimator.var_, np.finfo(float).eps),
+                      "prior": estimator.class_prior_}
+        model = Model.from_dict(Model(name, list(estimator.classes_), scaler.mean_, scaler.scale_, params).to_dict())
         pred = [model.predict(f, threshold, margin)[0] for f in xt]
         reports[name] = {"classification": classification_report(yt, pred, labels=labels,
                                                                  output_dict=True, zero_division=0),

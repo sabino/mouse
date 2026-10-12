@@ -38,11 +38,11 @@ def input_allowed():
             return False, "No X11 display. Preview/training need a desktop session."
     if sys.platform == "darwin":
         try:
-            from Quartz import AXIsProcessTrusted
+            from HIServices import AXIsProcessTrusted
             if not AXIsProcessTrusted():
                 return False, "Accessibility denied. Enable the running app in macOS Privacy & Security."
         except ImportError:
-            return False, "Quartz accessibility diagnostics unavailable"
+            return False, "HIServices accessibility diagnostics unavailable"
     return True, "Input permission preflight passed; physical operation still requires a manual test."
 
 
@@ -63,6 +63,10 @@ def monitors():
                 r = info.rect
                 found.append(Monitor(info.device, r.left, r.top, r.right-r.left, r.bottom-r.top))
             return True
+        ctypes.windll.user32.GetMonitorInfoW.argtypes = (wintypes.HMONITOR, ctypes.POINTER(Info))
+        ctypes.windll.user32.GetMonitorInfoW.restype = wintypes.BOOL
+        ctypes.windll.user32.EnumDisplayMonitors.argtypes = (wintypes.HDC, ctypes.POINTER(wintypes.RECT),
+                                                            callback_type, wintypes.LPARAM)
         callback = callback_type(collect)
         ctypes.windll.user32.EnumDisplayMonitors(None, None, callback, 0)
         return found

@@ -76,7 +76,7 @@ class WorkerState:
         return False
 
 
-def _worker(commands, status, inhibit, stop, epoch):
+def _worker(commands, status, inhibit, stop, epoch, release_complete):
     executor, listener, state = None, None, None
     def report(kind, detail):
         try:
@@ -135,11 +135,14 @@ def _worker(commands, status, inhibit, stop, epoch):
         inhibit.set()
         report("error", str(e))
     finally:
-        if executor:
+        while executor and executor.held:
             try:
                 executor.release_all()
             except Exception as e:
+                inhibit.set()
                 report("error", str(e))
+                time.sleep(0.1)
+        release_complete.set()
         if listener:
             listener.stop()
 
@@ -151,9 +154,10 @@ class InputSupervisor:
         self.status = ctx.Queue(maxsize=32)
         self.inhibit, self.stop = ctx.Event(), ctx.Event()
         self.epoch = ctx.Value("Q", 0)
+        self.release_complete = ctx.Event()
         self.inhibit.set()
-        self.process = ctx.Process(target=_worker, args=(self.commands, self.status, self.inhibit, self.stop, self.epoch),
-                                   name="MouseInputWatchdog", daemon=True)
+        self.process = ctx.Process(target=_worker, args=(self.commands, self.status, self.inhibit, self.stop, self.epoch, self.release_complete),
+                                   name="MouseInputWatchdog", daemon=False)
         self.process.start()
         self.token = None
         self.ready = False
@@ -168,6 +172,8 @@ class InputSupervisor:
                 break
             if kind == "ready":
                 self.ready = True
+            if kind == "error":
+                self.ready = False
             if kind == "stop":
                 self.emergency_verified = True
             if kind in ("stop", "error", "paused"):
@@ -212,4 +218,4 @@ class InputSupervisor:
         if self.process.is_alive():
             # Do not forcibly kill the process that might still be releasing app-held input.
             return False
-        return True
+        return self.release_complete.is_set()

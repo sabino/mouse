@@ -2,7 +2,7 @@ name: Verify and build native desktop
 on:
   pull_request:
   push:
-    branches: [dev, 'feat/**']
+    branches: [main, dev, 'feat/**']
   workflow_dispatch:
 permissions:
   contents: read
