@@ -45,15 +45,13 @@ Consulte [plataformas e permissões](docs/PLATFORMS.md) e a
 
 ## Instalação
 
-A aplicação completa está em **`main`**. A branch padrão do repositório ainda é `dev`;
-selecione `main` explicitamente.
+A aplicação completa está na branch padrão **`main`**.
 
 Com Python **3.11 ou 3.12**, Git e [uv](https://docs.astral.sh/uv/):
 
 ```sh
 git clone https://github.com/sabino/mouse.git
 cd mouse
-git switch main
 uv sync --locked --extra dev
 uv run --locked mouse-invisivel
 ```

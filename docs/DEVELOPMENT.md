@@ -38,14 +38,12 @@ essa estrutura. Os detalhes internos estão em [ARCHITECTURE](ARCHITECTURE.md).
 Siga a [instalação](INSTALLATION.md), com um checkout de `main` e Python 3.11/3.12:
 
 ```sh
-git switch main
 uv sync --locked --extra dev
 uv run --locked mouse-invisivel --help
 ```
 
-Para alterações, crie uma branch a partir de `main`. A branch padrão ainda é `dev`; não
-assuma que um clone inicial contém a versão desktop completa antes de selecionar `main`.
-Preserve alterações locais de outras pessoas e faça mudanças com escopo revisável.
+Para alterações, crie uma branch a partir de `main`, a branch padrão. Preserve alterações
+locais de outras pessoas e faça mudanças com escopo revisável.
 
 ## Verificação local
 

@@ -48,12 +48,11 @@ as proteções para contornar a recusa. A execução pelo código é uma alterna
 
 ## Opção B — código com uv
 
-A aplicação completa está em `main`; a branch padrão ainda é `dev`.
+A aplicação completa está na branch padrão `main`.
 
 ```sh
 git clone https://github.com/sabino/mouse.git
 cd mouse
-git switch main
 uv sync --locked --extra dev
 uv run --locked mouse-invisivel
 ```
@@ -64,7 +63,7 @@ fast-forward, preservando suas alterações locais.
 
 ## Opção C — código com pip
 
-Depois de clonar e selecionar `main`, crie uma venv e ative-a.
+Depois de clonar, crie uma venv e ative-a.
 
 Linux/macOS:
 
